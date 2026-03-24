@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stonescript Formatter</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+
+body {
+  background: #1a1c1e;
+  color: #bbbbbb;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Header ── */
+#header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  background: #111315;
+  border-bottom: 1px solid #252525;
+}
+#header h1 {
+  font-size: 12px;
+  color: #888;
+  font-weight: normal;
+  letter-spacing: .08em;
+}
+#status {
+  font-size: 11px;
+  color: #444;
+  margin-left: auto;
+}
+#status.ok  { color: #5a7a5a; }
+#status.err { color: #c96b6b; }
+
+/* ── Body layout: input | output ── */
+#body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  overflow: hidden;
+}
+
+/* ── Panels ── */
+.panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid #252525;
+}
+.panel:last-child { border-right: none; }
+
+.panel-label {
+  flex-shrink: 0;
+  font-size: 9.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: #444;
+  padding: 5px 14px 4px;
+  border-bottom: 1px solid #1e2022;
+  background: #111315;
+}
+
+/* ── Input textarea ── */
+#input {
+  flex: 1;
+  resize: none;
+  background: #0e1012;
+  color: #bbbbbb;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.65;
+  padding: 14px 16px;
+  border: none;
+  outline: none;
+  tab-size: 2;
+  overflow-y: auto;
+}
+#input::placeholder { color: #2a2a2a; }
+#input::-webkit-scrollbar { width: 5px; }
+#input::-webkit-scrollbar-thumb { background: #2a2a2a; }
+
+/* ── Output ── */
+#output {
+  flex: 1;
+  padding: 14px 16px;
+  overflow-y: auto;
+  white-space: pre;
+  line-height: 1.65;
+  font-size: 13px;
+}
+#output::-webkit-scrollbar { width: 5px; }
+#output::-webkit-scrollbar-thumb { background: #2a2a2a; }
+
+/* ── Token colours ── */
+.control    { color: #dddddd; font-weight: bold; }
+.comment    { color: #5a7a5a; }
+.continue-op{ color: #888888; }
+.command    { color: #9acdaa; }
+.keyword    { color: #7ab4d4; }
+.print      { color: #9acdaa; font-weight: bold; }
+.variable   { color: #cccccc; }
+.function   { color: #5ab4d4; }
+.operator   { color: #888888; }
+.number     { color: #c5b07a; }
+.string     { color: #8a7a6a; }
+.identifier { color: #aaaaaa; }
+.paren      { color: #666666; }
+.bracket    { color: #666666; }
+
+/* ── Warning ── */
+.warning {
+  background: rgba(180, 60, 60, .18);
+  border-bottom: 1px dashed #c96b6b;
+  cursor: help;
+  position: relative;
+  color: #c96b6b;
+}
+.warning::after {
+  content: attr(data-warning);
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background: #200f0f;
+  border: 1px solid #c96b6b;
+  color: #c96b6b;
+  font-size: 11px;
+  padding: 4px 8px;
+  white-space: nowrap;
+  display: none;
+  z-index: 10;
+  pointer-events: none;
+}
+.warning:hover::after { display: block; }
+
+/* ── AST panel (bottom, collapsible) ── */
+#ast-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 14px;
+  background: #111315;
+  border-top: 1px solid #1e2022;
+  cursor: pointer;
+  user-select: none;
+}
+#ast-bar span { font-size: 9.5px; color: #444; letter-spacing: .1em; text-transform: uppercase; }
+#ast-bar .toggle { margin-left: auto; color: #333; font-size: 11px; }
+
+#ast-pane {
+  display: none;
+  height: 200px;
+  overflow: auto;
+  background: #0c0d0f;
+  border-top: 1px solid #1a1a1a;
+  padding: 10px 14px;
+  font-size: 11px;
+  color: #444;
+  white-space: pre;
+}
+#ast-pane::-webkit-scrollbar { width: 4px; height: 4px; }
+#ast-pane::-webkit-scrollbar-thumb { background: #1e2022; }
+#ast-pane.open { display: block; }
+#ast-bar .toggle.open::before { content: '▼ '; }
+#ast-bar .toggle::before { content: '▶ '; }
+
+/* ── Loading overlay ── */
+#loading {
+  position: fixed; inset: 0;
+  background: #1a1c1e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #444;
+  letter-spacing: .1em;
+}
+</style>
+</head>
+<body>
+
+<div id="loading">Loading stonescript-api.json…</div>
+
+<div id="header" style="display:none">
+  <h1>·:·:· Stonescript Formatter ·:·:·</h1>
+  <div id="status"></div>
+</div>
+
+<div id="body" style="display:none">
+  <div class="panel">
+    <div class="panel-label">input</div>
+    <textarea id="input" spellcheck="false" placeholder="// paste Stonescript code here…"></textarea>
+  </div>
+  <div class="panel">
+    <div class="panel-label">formatted output</div>
+    <div id="output"></div>
+  </div>
+</div>
+
+<div id="ast-bar" style="display:none">
+  <span>AST</span>
+  <div class="toggle" id="ast-toggle"></div>
+</div>
+<div id="ast-pane" id="ast-pane"></div>
+
+<script src="StonescriptParser.js"></script>
+<script>
+(async () => {
+  // Load API JSON
+  let api;
+  try {
+    const r = await fetch('stonescript-api.json');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    api = await r.json();
+  } catch (e) {
+    document.getElementById('loading').textContent = 'Error: ' + e.message;
+    return;
+  }
+
+  const parser = new StonescriptParser(api);
+
+  // Hide loading, show UI
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('header').style.display  = '';
+  document.getElementById('body').style.display    = '';
+  document.getElementById('ast-bar').style.display = '';
+
+  const inputEl  = document.getElementById('input');
+  const outputEl = document.getElementById('output');
+  const statusEl = document.getElementById('status');
+  const astPane  = document.getElementById('ast-pane');
+  const astToggle= document.getElementById('ast-toggle');
+
+  // AST toggle
+  document.getElementById('ast-bar').addEventListener('click', () => {
+    astPane.classList.toggle('open');
+    astToggle.classList.toggle('open');
+  });
+
+  let debounce;
+  function update() {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => {
+      const code = inputEl.value;
+      if (!code.trim()) {
+        outputEl.innerHTML = '';
+        astPane.textContent = '';
+        statusEl.textContent = '';
+        statusEl.className = '';
+        return;
+      }
+      try {
+        const blocks  = parser.parse(code);
+        const html    = parser.toHtml(blocks);
+        outputEl.innerHTML = html;
+
+        // Count all warnings
+        function countWarns(bs) {
+          return bs.reduce((n, b) => n + b.warnings.length + countWarns(b.children), 0);
+        }
+        const wn = countWarns(blocks);
+        statusEl.textContent = wn > 0 ? `${wn} warning${wn>1?'s':''}` : 'ok';
+        statusEl.className   = wn > 0 ? 'err' : 'ok';
+
+        astPane.textContent = JSON.stringify(blocks, null, 2);
+      } catch (e) {
+        outputEl.textContent = 'Parser error: ' + e.message;
+        statusEl.textContent = 'error';
+        statusEl.className   = 'err';
+        console.error(e);
+      }
+    }, 120);
+  }
+
+  inputEl.addEventListener('input', update);
+
+  // Default example
+  inputEl.value = `?foe=boss
+ equipR ice sword D
+  activate P
+?loc=caves
+  loadout 1
+:?loc=deadwood
+  loadout 2
+:
+  loadout 3
+func test()
+  >"hello"
+  return 1
+disable hud
+var x = 0
+x++
+?
+equipR sword`;
+  update();
+})();
+</script>
+</body>
+</html>
