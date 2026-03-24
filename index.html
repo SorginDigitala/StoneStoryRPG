@@ -249,14 +249,23 @@ function renderLineByLine(lines) {
 // Render blocks to HTML, omitting the ⚠/? warning text characters
 // that _warnSpan() produces. Warning context comes from the full AST.
 function renderBlocksNoWarnText(blocks) {
+  function tokenHtml(type, value) {
+    if (type === 'space') return esc(value || ' ');
+    // If a token spans multiple lines (only happens with block comments),
+    // wrap each line in its own span so no span ever crosses a newline.
+    // This prevents the browser from extending the colour across hl-line wrappers.
+    if (value.includes('\n')) {
+      return value.split('\n')
+        .map(line => `<span class="${type}">${esc(line)}</span>`)
+        .join('\n');
+    }
+    return `<span class="${type}">${esc(value)}</span>`;
+  }
   function blockHtml(b) {
     if (b.type === 'empty') return '';
     const indent = ' '.repeat(b.indent);
-    const toks   = b.tokens.map(([type, value]) =>
-      type === 'space' ? esc(value || ' ') : `<span class="${type}">${esc(value)}</span>`
-    ).join('');
-    // children inline on same "line" for single-line parse
-    const kids = b.children.map(blockHtml).filter(Boolean).join('\n');
+    const toks   = b.tokens.map(([type, value]) => tokenHtml(type, value)).join('');
+    const kids   = b.children.map(blockHtml).filter(Boolean).join('\n');
     return indent + toks + (kids ? '\n' + kids : '');
   }
   return blocks.map(blockHtml).filter(Boolean).join('\n');

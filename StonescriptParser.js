@@ -62,6 +62,7 @@ class StonescriptParser {
     this.continuationStartsWith  = new Set();
     this.keywordsNotInExpr       = new Set();
     this.nonAssignableRoots      = new Set();
+    this.funcValidate            = {};
     this.validConditionOps       = new Set(['=','!','&','|','>','<','>=','<=']);
 
     // Loaded from ?.validate
@@ -122,6 +123,7 @@ class StonescriptParser {
     this.abilityKnown   = new Set((av.known_ability_ids || []).map(v => v.toLowerCase()));
     this.abilityCharset = av.charset ? new RegExp(av.charset) : /^[a-zA-Z_][a-zA-Z0-9_]*$/;
     this.validAbilityIds = new Set([...this.abilityFixed, ...this.abilityKnown]);
+    this.funcValidate    = (this.byId['func'] && this.byId['func'].validate) || {};
   }
 
   // ── PUBLIC API ────────────────────────────────────────────
@@ -271,17 +273,26 @@ class StonescriptParser {
         { name: 'for', value: expr });
     }
     if (this.keywords.includes(lc)) {
-      const arg = rest.trimStart(), def = this.byId[lc] || null;
+      const arg    = rest.trimStart(), def = this.byId[lc] || null;
       const tokens = [[T.KEYWORD, word]];
-      if (arg !== '') { tokens.push([T.SPACE, ' ']); tokens.push(...this._tokenizeExpr(arg)); }
+      if (arg !== '') {
+        // Preserve the original whitespace between keyword and argument
+        const spaces = rest.slice(0, rest.length - rest.trimStart().length);
+        tokens.push([T.SPACE, spaces || ' ']);
+        tokens.push(...this._tokenizeExpr(arg));
+      }
       const warnings = this._checkKeyword(lc, arg, def);
       return this._block(B.KEYWORD, indent, content, tokens, { name: word, value: arg, def, warnings });
     }
     if (this.commands.includes(lc)) {
-      const arg = rest.trimStart(), def = this._lookupCommand(word);
+      const arg    = rest.trimStart(), def = this._lookupCommand(word);
       const warnings = [...this._checkFollow(def, arg), ...this._checkCommand(lc, arg, def)];
       const tokens   = [[T.COMMAND, word]];
-      if (arg !== '') { tokens.push([T.SPACE, ' ']); tokens.push(...this._tokenizeArg(arg, def)); }
+      if (arg !== '') {
+        const spaces = rest.slice(0, rest.length - rest.trimStart().length);
+        tokens.push([T.SPACE, spaces || ' ']);
+        tokens.push(...this._tokenizeArg(arg, def));
+      }
       return this._block(B.COMMAND, indent, content, tokens, { name: word, value: arg, def, warnings });
     }
     if (rest.trimStart().startsWith('(')) return this._parseFuncCall(indent, content, word, rest.trimStart());
@@ -303,8 +314,27 @@ class StonescriptParser {
     const warnings = [
       ...((def && def.args && !def.overloads) ? this._checkArgCount(def, rest) : []),
       ...this._checkSealedProp(name),
+      ...this._checkCallTrailingJunk(rest),
     ];
     return this._block(B.CALL, indent, content, tokens, { name, value: rest, def, warnings });
+  }
+
+  // Detect junk after a function call: test() aoeu
+  _checkCallTrailingJunk(callStr) {
+    const s = callStr.trimStart();
+    if (!s.startsWith('(')) return [];
+    let depth = 1, i = 1;
+    while (i < s.length && depth > 0) {
+      if (s[i] === '(') depth++;
+      else if (s[i] === ')') depth--;
+      i++;
+    }
+    const after = s.slice(i).trim();
+    if (!after) return [];
+    if (after.startsWith('//') || after.startsWith('/*')) return [];
+    if (/^[=!<>&|+\-*\/%]/.test(after)) return [];
+    return [this._warn(W.BAD_EXPR,
+      `Token inesperado tras la llamada: '${after}'.`)];
   }
 
   // ── PASS 1C: TREE BUILDER ─────────────────────────────────
@@ -718,19 +748,31 @@ class StonescriptParser {
       `Conocidos: ${[...this.abilityKnown].join(', ')}.`)];
   }
 
-  // Rule: func signature must not have trailing junk after ()
-  // e.g. 'func test() aeou' → error
+  // Rule: func signature — name must be valid identifier, no trailing junk
+  // Data-driven: func.validate.name_pattern and no_trailing_junk from JSON
   _checkFuncSig(sig) {
-    // Match: name(params) and optionally trailing content
-    const m = sig.trim().match(/^[a-zA-Z_][a-zA-Z0-9_]*\s*\([^)]*\)\s*(.*)/);
-    if (!m) return [];  // malformed sig — other checks will catch it
-    const trailing = m[1].trim();
-    if (!trailing) return [];
-    // Inline comment is fine
-    if (trailing.startsWith('//') || trailing.startsWith('/*')) return [];
-    return [this._warn(W.BAD_EXPR,
-      `Tokens inesperados tras la firma de la funcion: '${trailing}'. ` +
-      `Una definicion de funcion no puede tener codigo en la misma linea.`)];
+    const trimmed = sig.trim();
+    const warns   = [];
+    const nameMatch = trimmed.match(/^([^\s(]+)/);
+    if (nameMatch) {
+      const name        = nameMatch[1];
+      const namePattern = this.funcValidate.name_pattern || '^[a-zA-Z_][a-zA-Z0-9_]*$';
+      if (!new RegExp(namePattern).test(name))
+        warns.push(this._warn(W.BAD_VAR,
+          `'${name}' no es un nombre de funcion valido. ` +
+          (this.funcValidate.name_pattern_desc ||
+           'Solo letras a-z A-Z, digitos y _. No puede empezar por numero.')));
+    }
+    if (this.funcValidate.no_trailing_junk !== false) {
+      const m = trimmed.match(/^[^\s(]*\s*\([^)]*\)\s*(.*)/);
+      if (m) {
+        const trailing = m[1].trim();
+        if (trailing && !trailing.startsWith('//') && !trailing.startsWith('/*'))
+          warns.push(this._warn(W.BAD_EXPR,
+            `Tokens inesperados tras la firma de la funcion: '${trailing}'.`));
+      }
+    }
+    return warns;
   }
 
   // Rule: assignment to native (sealed) variable
@@ -746,23 +788,23 @@ class StonescriptParser {
 
   // Rule: no trailing junk after condition expression
   // e.g. ?hp<foe.hp aoeu  → 'aoeu' has no operator before it
+  // e.g. ?test() aeuo     → 'aeuo' follows ')' with no operator
   _checkCondTrailingJunk(expr) {
     if (!expr || !this.condValidate.no_trailing_junk) return [];
-    // Tokenize and look for IDENTIFIER/VARIABLE token not preceded by an operator
     const tokens = this._tokenizeExpr(expr);
-    let lastMeaningful = null; // last non-space token type
+    let lastMeaningful = null;
     for (const [type, value] of tokens) {
       if (type === 'space' || type === 'comment') continue;
       if (type === 'identifier' || type === 'variable') {
-        // If previous meaningful token was also an identifier/variable/number/string
-        // with no operator in between → junk
-        if (lastMeaningful && ['identifier','variable','number','string'].includes(lastMeaningful)) {
+        if (lastMeaningful && ['identifier','variable','number','string','paren'].includes(lastMeaningful)) {
           return [this._warn(W.BAD_EXPR,
             `Token inesperado en la condicion: '${value}'. ` +
             `Falta un operador (= ! < > <= >= & |) antes de este valor.`)];
         }
       }
-      lastMeaningful = type;
+      // Track close-paren as a value context; open-paren resets it
+      if (type === 'paren') lastMeaningful = value === ')' ? 'paren' : null;
+      else lastMeaningful = type;
     }
     return [];
   }
