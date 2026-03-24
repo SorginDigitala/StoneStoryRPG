@@ -61,6 +61,7 @@ class StonescriptParser {
     this.validAbilityIds         = new Set();
     this.continuationStartsWith  = new Set();
     this.keywordsNotInExpr       = new Set();
+    this.nonAssignableRoots      = new Set();
     this.validConditionOps       = new Set(['=','!','&','|','>','<','>=','<=']);
 
     // Loaded from ?.validate
@@ -101,6 +102,7 @@ class StonescriptParser {
             this.validAbilityIds        = new Set(e.valid_ability_ids          || []);
             this.continuationStartsWith = new Set(e.continuation_must_start_with || []);
             this.keywordsNotInExpr      = new Set(e.keywords_not_allowed_in_expr || []);
+            this.nonAssignableRoots     = new Set(e.non_assignable_roots        || []);
           }
           break;
       }
@@ -138,7 +140,18 @@ class StonescriptParser {
     let i = 0;
     while (i < lines.length) {
       const line = lines[i];
-      if (line.includes('/*') && this._findCommentClose(line) === -1) {
+
+      // A multiline block /* ... */ starts only when:
+      // 1. The line is not a // line comment (// before /* means /* is inside the comment)
+      // 2. /* appears with no code before it (only whitespace)
+      // 3. The block does NOT close on the same line
+      const isLineComment = line.trimStart().startsWith('//');
+      const openIdx       = isLineComment ? -1 : line.indexOf('/*');
+      const isBlockStart  = openIdx >= 0
+        && line.slice(0, openIdx).trim() === ''
+        && this._findCommentClose(line) === -1;
+
+      if (isBlockStart) {
         let collected = line; i++;
         while (i < lines.length) {
           collected += '\n' + lines[i];
@@ -146,7 +159,9 @@ class StonescriptParser {
           i++;
         }
         out.push(collected);
-      } else { out.push(line); i++; }
+      } else {
+        out.push(line); i++;
+      }
     }
     return out;
   }
@@ -243,10 +258,11 @@ class StonescriptParser {
     const word = m[1], rest = m[2] || '', lc = word.toLowerCase();
 
     if (lc === 'func') {
-      const sig = rest.trimStart();
+      const sig      = rest.trimStart();
+      const warnings = this._checkFuncSig(sig);
       return this._block(B.FUNC_DEF, indent, content,
         [[T.KEYWORD, 'func'], [T.SPACE, ' '], ...this._tokenizeFuncSig(sig)],
-        { name: 'func', value: sig });
+        { name: 'func', value: sig, warnings });
     }
     if (lc === 'for') {
       const expr = rest.trimStart();
@@ -270,8 +286,9 @@ class StonescriptParser {
     }
     if (rest.trimStart().startsWith('(')) return this._parseFuncCall(indent, content, word, rest.trimStart());
     if (/^\s*[+\-*\/]?=/.test(rest) || rest.trimStart().startsWith('++') || rest.trimStart().startsWith('--')) {
-      const tokens = [...this._resolveIdentToken(word), ...this._tokenizeExpr(rest)];
-      return this._block(B.ASSIGN, indent, content, tokens, { name: word, value: rest.trim() });
+      const tokens   = [...this._resolveIdentToken(word), ...this._tokenizeExpr(rest)];
+      const warnings = this._checkAssignment(word);
+      return this._block(B.ASSIGN, indent, content, tokens, { name: word, value: rest.trim(), warnings });
     }
 
     // Bare word: Rule 3 (bad statement) + Rule 7 (sealed prop)
@@ -524,13 +541,14 @@ class StonescriptParser {
     }
 
     // Sealed property access inside the expression (e.g. ?foe.test>0)
-    // Walk all dotted words in the expression
     const dottedWords = expr.match(/\b[a-zA-Z_][a-zA-Z0-9_.]*\b/g) || [];
     for (const dw of dottedWords) {
       if (!dw.includes('.')) continue;
-      const sealedWarns = this._checkSealedProp(dw);
-      warns.push(...sealedWarns);
+      warns.push(...this._checkSealedProp(dw));
     }
+
+    // Trailing junk (e.g. ?hp<foe.hp aoeu)
+    warns.push(...this._checkCondTrailingJunk(expr));
 
     return warns;
   }
@@ -579,46 +597,90 @@ class StonescriptParser {
   }
 
   // Rule 4: import validation — reads from importValidate (JSON)
+  // '//' always starts a comment in Stonescript (with or without space before it).
+  // So 'import valido//comment' → path is 'valido', comment is '//comment'.
+  // But 'import test//bad' also strips to 'test' which is valid —
+  // the double-slash in the path is swallowed by the comment strip.
+  // This matches Stonescript's actual behaviour: // is always a comment delimiter.
   _checkImport(path) {
-    if (!path.trim()) return [];
-    const warns = [];
-    if (this.importValidate.no_spaces && /\s/.test(path))
-      warns.push(this._warn(W.BAD_IMPORT,
-        `La ruta '${path}' no puede contener espacios.`));
-    else if (this.importValidate.pattern) {
+    // Strip everything from // onward (always a comment)
+    const commentIdx = path.indexOf('//');
+    const stripped   = (commentIdx >= 0 ? path.slice(0, commentIdx) : path).trim();
+    if (!stripped) return [];
+    // Spaces inside (after strip+trim): genuine error
+    if (this.importValidate.no_spaces && /\s/.test(stripped))
+      return [this._warn(W.BAD_IMPORT,
+        `La ruta '${stripped}' no puede contener espacios.`)];
+    if (this.importValidate.pattern) {
       const re = new RegExp(this.importValidate.pattern);
-      if (!re.test(path))
-        warns.push(this._warn(W.BAD_IMPORT,
-          `La ruta '${path}' contiene caracteres no validos. ` +
-          (this.importValidate.pattern_desc || `Solo se permiten letras a-z A-Z, digitos 0-9, /, _, . y -`)));
+      if (!re.test(stripped))
+        return [this._warn(W.BAD_IMPORT,
+          `La ruta '${stripped}' no es valida. ` +
+          (this.importValidate.pattern_desc || `Segmentos separados por un solo /. Solo letras, digitos, _ . -`))];
     }
-    return warns;
+    return [];
   }
 
   // Rule 5: var declaration validation — reads from varValidate (JSON)
   _checkVarDecl(arg) {
-    if (!arg.trim()) return [];
-    const nameMatch = arg.trim().match(/^([^\s=]+)/);
-    if (!nameMatch) return [];
-    const name = nameMatch[1];
+    const trimmed = arg.trim();
+    if (!trimmed) return [];
 
-    if (/,/.test(name) || /\s/.test(arg.trim().replace(/\s*=.*/, '')))
+    // Split name from value: var name = value  or  var name
+    const eqIdx  = trimmed.indexOf('=');
+    const namePart = (eqIdx >= 0 ? trimmed.slice(0, eqIdx) : trimmed).trim();
+    const valPart  = eqIdx >= 0 ? trimmed.slice(eqIdx + 1).trim() : '';
+
+    // Multiple declarations: var a,b
+    if (/,/.test(namePart))
       return [this._warn(W.BAD_VAR,
         `Solo se puede declarar una variable a la vez. Usa una linea 'var' por variable.`)];
 
-    // Validate with pattern from JSON
+    // Extra words in the name part: var a b = ...
+    if (/\s/.test(namePart))
+      return [this._warn(W.BAD_VAR,
+        `Solo se puede declarar una variable a la vez. Usa una linea 'var' por variable.`)];
+
+    const name = namePart;
+
+    // Valid identifier
     const pattern = this.varValidate.identifier_pattern || '^[a-zA-Z_][a-zA-Z0-9_]*$';
     if (!new RegExp(pattern).test(name))
       return [this._warn(W.BAD_VAR,
         `'${name}' no es un nombre de variable valido. ` +
         `Debe empezar por letra o _ y solo contener letras a-z A-Z, digitos 0-9 y _.`)];
 
-    // Check reserved names from JSON
+    // Reserved native name
     if (this.reservedNames.has(name))
       return [this._warn(W.BAD_VAR,
         `'${name}' es una variable nativa del juego y no puede usarse como nombre de variable.`)];
 
+    // Junk after value: var test = aoeu aoeu
+    // If the value part contains unquoted spaces between words → junk
+    if (this.varValidate.no_junk_after_value && valPart) {
+      const junk = this._detectExprJunk(valPart);
+      if (junk) return [this._warn(W.BAD_VAR,
+        `Valor de variable invalido: '${valPart}'. ` +
+        `Token inesperado: '${junk}'. Si es una cadena, usa comillas: var ${name} = "${valPart}"`)];
+    }
+
     return [];
+  }
+
+  // Detect trailing junk in an expression value: multiple words without operator
+  // Returns the junk word or null if clean
+  _detectExprJunk(val) {
+    const tokens = this._tokenizeExpr(val);
+    const VALUE_TYPES = new Set(['identifier','variable','number','string']);
+    let lastType = null;
+    for (const [type, value] of tokens) {
+      if (type === 'space' || type === 'comment') continue;
+      if (VALUE_TYPES.has(type) && VALUE_TYPES.has(lastType)) {
+        return value; // two value-tokens with no operator between them
+      }
+      lastType = type;
+    }
+    return null;
   }
 
   // Rule 6: activate — data-driven from activate.arg_validation in JSON
@@ -654,6 +716,55 @@ class StonescriptParser {
       `'${val}' no es un ability ID reconocido. ` +
       `Fijos: ${[...this.abilityFixed].join(', ')}. ` +
       `Conocidos: ${[...this.abilityKnown].join(', ')}.`)];
+  }
+
+  // Rule: func signature must not have trailing junk after ()
+  // e.g. 'func test() aeou' → error
+  _checkFuncSig(sig) {
+    // Match: name(params) and optionally trailing content
+    const m = sig.trim().match(/^[a-zA-Z_][a-zA-Z0-9_]*\s*\([^)]*\)\s*(.*)/);
+    if (!m) return [];  // malformed sig — other checks will catch it
+    const trailing = m[1].trim();
+    if (!trailing) return [];
+    // Inline comment is fine
+    if (trailing.startsWith('//') || trailing.startsWith('/*')) return [];
+    return [this._warn(W.BAD_EXPR,
+      `Tokens inesperados tras la firma de la funcion: '${trailing}'. ` +
+      `Una definicion de funcion no puede tener codigo en la misma linea.`)];
+  }
+
+  // Rule: assignment to native (sealed) variable
+  // Data-driven: non_assignable_roots from __validation__ in JSON
+  _checkAssignment(name) {
+    const root = name.split('.')[0];
+    if (this.nonAssignableRoots.has(root))
+      return [this._warn(W.BAD_STATEMENT,
+        `'${name}' es una variable nativa y no puede ser asignada.`)];
+    // Also check sealed prop for dotted names (foe.hello = 2)
+    return this._checkSealedProp(name);
+  }
+
+  // Rule: no trailing junk after condition expression
+  // e.g. ?hp<foe.hp aoeu  → 'aoeu' has no operator before it
+  _checkCondTrailingJunk(expr) {
+    if (!expr || !this.condValidate.no_trailing_junk) return [];
+    // Tokenize and look for IDENTIFIER/VARIABLE token not preceded by an operator
+    const tokens = this._tokenizeExpr(expr);
+    let lastMeaningful = null; // last non-space token type
+    for (const [type, value] of tokens) {
+      if (type === 'space' || type === 'comment') continue;
+      if (type === 'identifier' || type === 'variable') {
+        // If previous meaningful token was also an identifier/variable/number/string
+        // with no operator in between → junk
+        if (lastMeaningful && ['identifier','variable','number','string'].includes(lastMeaningful)) {
+          return [this._warn(W.BAD_EXPR,
+            `Token inesperado en la condicion: '${value}'. ` +
+            `Falta un operador (= ! < > <= >= & |) antes de este valor.`)];
+        }
+      }
+      lastMeaningful = type;
+    }
+    return [];
   }
 
   // Dispatch keyword validations

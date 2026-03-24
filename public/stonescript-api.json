@@ -24,7 +24,9 @@
       "no_keywords_as_operands": true,
       "no_embedded_condition": true,
       "no_bare_string": true,
-      "description": "La expresion de condicion debe usar operadores validos. No puede contener keywords (var, func...), strings sin operador, ni caracteres ? embebidos."
+      "description": "La expresion de condicion debe usar operadores validos. No puede contener keywords (var, func...), strings sin operador, ni caracteres ? embebidos.",
+      "no_trailing_junk": true,
+      "no_trailing_junk_desc": "Tras el ultimo operando/valor de la condicion no puede haber palabras sueltas sin operador."
     }
   },
   {
@@ -61,7 +63,9 @@
       "no_keywords_as_operands": true,
       "no_embedded_condition": true,
       "no_bare_string": true,
-      "description": "La expresion de condicion debe usar operadores validos. No puede contener keywords (var, func...), strings sin operador, ni caracteres ? embebidos."
+      "description": "La expresion de condicion debe usar operadores validos. No puede contener keywords (var, func...), strings sin operador, ni caracteres ? embebidos.",
+      "no_trailing_junk": true,
+      "no_trailing_junk_desc": "Tras el ultimo operando/valor de la condicion no puede haber palabras sueltas sin operador."
     }
   },
   {
@@ -280,7 +284,8 @@
         "totaltime",
         "ui",
         "utc"
-      ]
+      ],
+      "no_junk_after_value": true
     }
   },
   {
@@ -349,8 +354,8 @@
     "validate": {
       "no_spaces": true,
       "non_empty": true,
-      "pattern": "^[a-zA-Z0-9/_.-]+$",
-      "pattern_desc": "Solo se permiten letras a-z A-Z, digitos 0-9, /, _, . y -"
+      "pattern": "^[a-zA-Z0-9_.-]+(/[a-zA-Z0-9_.-]+)*$",
+      "pattern_desc": "Ruta de archivo: segmentos separados por un solo /. Solo letras a-z A-Z, digitos, _ . -"
     }
   },
   {
@@ -4567,6 +4572,42 @@
       "return",
       "var"
     ],
-    "ability_id_source": "activate.arg_validation"
+    "ability_id_source": "activate.arg_validation",
+    "non_assignable_roots": [
+      "ai",
+      "ambient",
+      "armor",
+      "bighead",
+      "buffs",
+      "debuffs",
+      "encounter",
+      "face",
+      "foe",
+      "harvest",
+      "hp",
+      "input",
+      "item",
+      "key",
+      "loc",
+      "math",
+      "maxarmor",
+      "maxhp",
+      "music",
+      "pickup",
+      "player",
+      "pos",
+      "res",
+      "rng",
+      "rngf",
+      "screen",
+      "summon",
+      "sys",
+      "te",
+      "time",
+      "totalgp",
+      "totaltime",
+      "utc"
+    ],
+    "non_assignable_note": "Variables nativas selladas: sus raices no pueden ser asignadas directamente. foe=\"x\", totaltime=5, hp=0 etc. son errores."
   }
 ]

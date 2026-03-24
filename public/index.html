@@ -201,16 +201,49 @@ function doRender() {
 // Warning characters (⚠ ?) are stripped so no extra characters
 // appear in the highlight that would shift the textarea cursor.
 function renderLineByLine(lines) {
-  return lines.map(line => {
-    if (!line.trim()) return '';   // blank/whitespace → empty, preserves position
-    try {
-      const blocks = parser.parse(line);
-      // Render tokens only — no warning text characters
-      return renderBlocksNoWarnText(blocks);
-    } catch(e) {
-      return esc(line);
+  // Strategy: parse the FULL code (needed for multiline /* */ comments),
+  // then walk the flat block list and emit exactly one HTML string per
+  // source line — including empty strings for blank/EMPTY lines.
+  const code = lines.join('\n');
+  if (!code.trim()) return lines.map(() => '');
+
+  // We need the flat parsed lines (before tree-building) to preserve EMPTY blocks.
+  // Use parser._splitLines + parser._parseLine directly.
+  let flatBlocks;
+  try {
+    const rawLines = parser._splitLines(code);
+    flatBlocks = rawLines.map(l => parser._parseLine(l));
+  } catch(e) {
+    return lines.map(l => esc(l));
+  }
+
+  // flatBlocks maps 1:1 to rawLines from _splitLines, but _splitLines may
+  // collapse multiline /* */ into one entry. We need to expand those back
+  // to fill the correct number of source lines.
+  const result = [];
+  let srcIdx = 0;
+  for (const b of flatBlocks) {
+    if (b.type === 'empty') {
+      result.push('');
+      srcIdx++;
+    } else if (b.raw && b.raw.includes('\n')) {
+      // Multiline block (collapsed /* */ comment): emit colored first line,
+      // then empty strings for the continuation lines so positions stay aligned.
+      const rawLineCount = b.raw.split('\n').length;
+      const html = renderBlocksNoWarnText([b]);
+      const htmlLines = html.split('\n');
+      for (let j = 0; j < rawLineCount; j++) {
+        result.push(htmlLines[j] || '');
+      }
+      srcIdx += rawLineCount;
+    } else {
+      result.push(renderBlocksNoWarnText([b]));
+      srcIdx++;
     }
-  });
+  }
+  // Pad to source line count
+  while (result.length < lines.length) result.push('');
+  return result;
 }
 
 // Render blocks to HTML, omitting the ⚠/? warning text characters
@@ -412,7 +445,7 @@ function hlMatch(str, q) {
 
 // ── Input events ──────────────────────────────────────────────
 inputEl.addEventListener('input', () => {
-  updateActiveLine(); triggerAC(); scheduleRender();
+  updateActiveLine(); scheduleRender();
 });
 
 inputEl.addEventListener('keydown', e => {
@@ -427,10 +460,15 @@ inputEl.addEventListener('keydown', e => {
   }
   if (e.key === 'Tab' && !acOpen) {
     e.preventDefault();
-    const s = inputEl.selectionStart, en = inputEl.selectionEnd;
-    inputEl.value = inputEl.value.slice(0, s) + '  ' + inputEl.value.slice(en);
-    inputEl.setSelectionRange(s + 2, s + 2);
-    updateActiveLine(); scheduleRender();
+    const { word } = wordAtCursor();
+    if (word.length >= 1) {
+      triggerAC(); // Tab with word → open autocomplete
+    } else {
+      const s = inputEl.selectionStart, en = inputEl.selectionEnd;
+      inputEl.value = inputEl.value.slice(0, s) + '  ' + inputEl.value.slice(en);
+      inputEl.setSelectionRange(s + 2, s + 2);
+      updateActiveLine(); scheduleRender();
+    }
   }
 });
 
