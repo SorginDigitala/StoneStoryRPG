@@ -1,293 +1,600 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stonescript Formatter</title>
+<title>Stonescript Editor</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 14px; }
 
+:root {
+  --bg:          #0e1012;
+  --bg-panel:    #111315;
+  --bg-header:   #0c0d0f;
+  --border:      #1e2022;
+  --border2:     #252525;
+  --gutter-bg:   #0c0d0f;
+  --gutter-fg:   #2e3235;
+  --gutter-act:  #5a6570;
+  --line-active: rgba(255,255,255,0.026);
+  --line-warn:   rgba(201,107,107,0.09);
+  --text:        #bbbbbb;
+  --text-dim:    #444;
+  --ok:          #5a7a5a;
+  --err:         #c96b6b;
+  --accent:      #7ab4d4;
+
+  --font: 'Courier New', Courier, monospace;
+  --fs:   13px;
+  --pad:  12px;
+  --gw:   44px;
+}
+
+html, body { height: 100%; overflow: hidden; }
 body {
-  background: #1a1c1e;
-  color: #bbbbbb;
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 13px;
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
+  background: var(--bg); color: var(--text);
+  font-family: var(--font); font-size: var(--fs);
+  display: flex; flex-direction: column;
 }
 
-/* ── Header ── */
+/* Header */
 #header {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 10px 16px;
-  background: #111315;
-  border-bottom: 1px solid #252525;
+  flex-shrink: 0; display: flex; align-items: center; gap: 16px;
+  padding: 8px 16px; background: var(--bg-header);
+  border-bottom: 1px solid var(--border2); user-select: none;
 }
-#header h1 {
-  font-size: 12px;
-  color: #888;
-  font-weight: normal;
-  letter-spacing: .08em;
-}
-#status {
-  font-size: 11px;
-  color: #444;
-  margin-left: auto;
-}
-#status.ok  { color: #5a7a5a; }
-#status.err { color: #c96b6b; }
+#header h1 { font-size: 11px; color: #555; font-weight: normal; letter-spacing: .12em; }
+#status { margin-left: auto; font-size: 11px; color: var(--text-dim); }
+#status.ok  { color: var(--ok); }
+#status.err { color: var(--err); }
 
-/* ── Body layout: input | output ── */
+/* Body */
 #body {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  overflow: hidden;
+  flex: 1; display: grid; grid-template-columns: 1fr 1fr;
+  overflow: hidden; min-height: 0;
 }
-
-/* ── Panels ── */
 .panel {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border-right: 1px solid #252525;
+  display: flex; flex-direction: column;
+  overflow: hidden; border-right: 1px solid var(--border2); min-height: 0;
 }
 .panel:last-child { border-right: none; }
-
 .panel-label {
-  flex-shrink: 0;
-  font-size: 9.5px;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: #444;
-  padding: 5px 14px 4px;
-  border-bottom: 1px solid #1e2022;
-  background: #111315;
+  flex-shrink: 0; font-size: 9px; letter-spacing: .14em;
+  text-transform: uppercase; color: #333; padding: 4px 12px;
+  border-bottom: 1px solid var(--border); background: var(--bg-panel);
 }
 
-/* ── Input textarea ── */
+/* Editor layout */
+#editor-outer { flex: 1; display: flex; overflow: hidden; min-height: 0; }
+
+/* Gutter */
+#gutter {
+  flex-shrink: 0; width: var(--gw); background: var(--gutter-bg);
+  border-right: 1px solid var(--border); overflow: hidden;
+  position: relative; user-select: none;
+}
+#gutter-inner {
+  position: absolute; top: 0; left: 0; right: 0;
+  padding-top: var(--pad); will-change: transform;
+}
+.gn {
+  display: block; text-align: right; padding-right: 8px;
+  font-size: 11px; font-family: var(--font); line-height: 1.65;
+  color: var(--gutter-fg); white-space: nowrap;
+}
+.gn.act  { color: var(--gutter-act); }
+.gn.warn { color: var(--err); cursor: default; }
+
+/*
+  EDITOR SCROLL AREA
+  ──────────────────
+  #editor-scroll is the single scrollable container.
+  #highlight is position:relative (in-flow) → sizes the container.
+  #input    is position:absolute, same inset, overflow:hidden (no own scroll).
+  Both have IDENTICAL padding and font settings.
+*/
+#editor-scroll {
+  flex: 1; position: relative; overflow: auto; min-height: 0;
+  background: var(--bg);
+}
+#editor-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+#editor-scroll::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
+
+/* Shared geometry — applied to BOTH layers */
+#highlight, #input {
+  font-family: var(--font); font-size: var(--fs); line-height: 1.65;
+  padding: var(--pad) 14px; white-space: pre; tab-size: 2;
+  border: none; outline: none; margin: 0; letter-spacing: 0;
+  word-spacing: 0;
+}
+
+/* Highlight layer (behind) */
+#highlight {
+  position: relative;    /* in normal flow → sizes scroll area */
+  display: block;
+  min-width: 100%;
+  color: transparent;    /* base text invisible; spans provide colour */
+  pointer-events: none;
+  background: transparent;
+  overflow: visible;
+}
+
+/* Textarea (on top) */
 #input {
-  flex: 1;
-  resize: none;
-  background: #0e1012;
-  color: #bbbbbb;
-  font-family: 'Courier New', monospace;
-  font-size: 13px;
-  line-height: 1.65;
-  padding: 14px 16px;
-  border: none;
-  outline: none;
-  tab-size: 2;
-  overflow-y: auto;
+  position: absolute; top: 0; left: 0;
+  width: 100%; min-height: 100%;
+  resize: none; background: transparent;
+  color: rgba(0,0,0,0);  /* invisible text */
+  caret-color: #bbb;
+  overflow: hidden;      /* NO independent scroll */
+  z-index: 2;
 }
-#input::placeholder { color: #2a2a2a; }
-#input::-webkit-scrollbar { width: 5px; }
-#input::-webkit-scrollbar-thumb { background: #2a2a2a; }
+#input::selection { background: rgba(122,180,212,0.22); }
 
-/* ── Output ── */
+/* Line wrappers inside highlight */
+.hl-line { display: block; }
+.hl-line.active { background: var(--line-active); }
+.hl-line.warn   { background: var(--line-warn); }
+
+/* Token colours */
+.control     { color: #e0e0e0; font-weight: bold; }
+.comment     { color: #4e6e4e; font-style: italic; }
+.continue-op { color: #666; }
+.command     { color: #9acdaa; }
+.keyword     { color: var(--accent); }
+.print       { color: #9acdaa; font-weight: bold; }
+.variable    { color: #c8c8c8; }
+.function    { color: #5ab4d4; }
+.operator    { color: #777; }
+.number      { color: #c5b07a; }
+.string      { color: #8a7a6a; }
+.identifier  { color: #aaaaaa; }
+.paren       { color: #555; }
+.bracket     { color: #555; }
+.warning     { color: var(--err) !important; border-bottom: 1px dashed var(--err); }
+
+/* Output panel */
 #output {
-  flex: 1;
-  padding: 14px 16px;
-  overflow-y: auto;
-  white-space: pre;
-  line-height: 1.65;
-  font-size: 13px;
+  flex: 1; padding: var(--pad) 14px; overflow: auto;
+  white-space: pre; line-height: 1.65; font-size: var(--fs);
 }
 #output::-webkit-scrollbar { width: 5px; }
-#output::-webkit-scrollbar-thumb { background: #2a2a2a; }
+#output::-webkit-scrollbar-thumb { background: #222; }
 
-/* ── Token colours ── */
-.control    { color: #dddddd; font-weight: bold; }
-.comment    { color: #5a7a5a; }
-.continue-op{ color: #888888; }
-.command    { color: #9acdaa; }
-.keyword    { color: #7ab4d4; }
-.print      { color: #9acdaa; font-weight: bold; }
-.variable   { color: #cccccc; }
-.function   { color: #5ab4d4; }
-.operator   { color: #888888; }
-.number     { color: #c5b07a; }
-.string     { color: #8a7a6a; }
-.identifier { color: #aaaaaa; }
-.paren      { color: #666666; }
-.bracket    { color: #666666; }
-
-/* ── Warning ── */
-.warning {
-  background: rgba(180, 60, 60, .18);
-  border-bottom: 1px dashed #c96b6b;
-  cursor: help;
-  position: relative;
-  color: #c96b6b;
+/* Tooltip */
+#tooltip {
+  position: fixed; z-index: 300; background: #180c0c;
+  border: 1px solid #c96b6b55; color: var(--err);
+  font-size: 11px; font-family: var(--font);
+  padding: 5px 10px; border-radius: 2px; pointer-events: none;
+  display: none; max-width: 360px; white-space: normal; line-height: 1.5;
 }
-.warning::after {
-  content: attr(data-warning);
-  position: absolute;
-  bottom: 100%;
-  left: 0;
-  background: #200f0f;
-  border: 1px solid #c96b6b;
-  color: #c96b6b;
-  font-size: 11px;
-  padding: 4px 8px;
-  white-space: nowrap;
-  display: none;
-  z-index: 10;
-  pointer-events: none;
-}
-.warning:hover::after { display: block; }
 
-/* ── AST panel (bottom, collapsible) ── */
-#ast-bar {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 5px 14px;
-  background: #111315;
-  border-top: 1px solid #1e2022;
-  cursor: pointer;
-  user-select: none;
+/* Autocomplete */
+#ac {
+  position: fixed; z-index: 200; background: #141618;
+  border: 1px solid #2a3035; border-radius: 3px;
+  display: none; max-height: 210px; overflow-y: auto; min-width: 230px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.65);
 }
-#ast-bar span { font-size: 9.5px; color: #444; letter-spacing: .1em; text-transform: uppercase; }
-#ast-bar .toggle { margin-left: auto; color: #333; font-size: 11px; }
-
-#ast-pane {
-  display: none;
-  height: 200px;
-  overflow: auto;
-  background: #0c0d0f;
-  border-top: 1px solid #1a1a1a;
-  padding: 10px 14px;
-  font-size: 11px;
-  color: #444;
-  white-space: pre;
+#ac::-webkit-scrollbar { width: 4px; }
+#ac::-webkit-scrollbar-thumb { background: #222; }
+.aci {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 5px 11px; cursor: pointer; font-size: 12px;
+  border-bottom: 1px solid #1a1c1e; font-family: var(--font);
 }
-#ast-pane::-webkit-scrollbar { width: 4px; height: 4px; }
-#ast-pane::-webkit-scrollbar-thumb { background: #1e2022; }
-#ast-pane.open { display: block; }
-#ast-bar .toggle.open::before { content: '▼ '; }
-#ast-bar .toggle::before { content: '▶ '; }
+.aci:last-child { border-bottom: none; }
+.aci:hover, .aci.sel { background: #1e2428; }
+.aci-name { color: #c8c8c8; font-weight: bold; min-width: 130px; }
+.aci-kind { color: #3a5060; font-size: 10px; letter-spacing: .05em; }
+.aci-m    { color: var(--accent); }
 
-/* ── Loading overlay ── */
+/* Warn bar */
+#wbar {
+  flex-shrink: 0; background: var(--bg-header);
+  border-top: 1px solid var(--border);
+  overflow: hidden; max-height: 22px; transition: max-height .18s ease;
+}
+#wbar.open { max-height: 170px; }
+#wbar-hdr {
+  display: flex; align-items: center; gap: 8px; padding: 4px 12px;
+  cursor: pointer; user-select: none;
+  font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: #333;
+}
+#wbar-hdr .wc { color: var(--err); margin-left: 4px; }
+#wbar-hdr .wt { margin-left: auto; color: #2a2a2a; }
+#wlist { max-height: 144px; overflow-y: auto; }
+#wlist::-webkit-scrollbar { width: 4px; }
+#wlist::-webkit-scrollbar-thumb { background: #222; }
+.we {
+  display: flex; gap: 10px; padding: 3px 12px;
+  cursor: pointer; font-size: 11px; color: #664444; font-family: var(--font);
+}
+.we:hover { background: #160c0c; color: var(--err); }
+.we-ln { color: #553333; min-width: 38px; }
+
+/* Loading */
 #loading {
-  position: fixed; inset: 0;
-  background: #1a1c1e;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  color: #444;
-  letter-spacing: .1em;
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: #333; letter-spacing: .14em;
 }
 </style>
 </head>
 <body>
 
-<div id="loading">Loading stonescript-api.json…</div>
+<div id="loading">cargando stonescript-api.json…</div>
 
 <div id="header" style="display:none">
-  <h1>·:·:· Stonescript Formatter ·:·:·</h1>
+  <h1>·:·:· STONESCRIPT EDITOR ·:·:·</h1>
   <div id="status"></div>
 </div>
 
 <div id="body" style="display:none">
   <div class="panel">
-    <div class="panel-label">input</div>
-    <textarea id="input" spellcheck="false" placeholder="// paste Stonescript code here…"></textarea>
+    <div class="panel-label">código</div>
+    <div id="editor-outer">
+      <div id="gutter"><div id="gutter-inner"></div></div>
+      <div id="editor-scroll">
+        <div id="highlight" aria-hidden="true"></div>
+        <textarea id="input" spellcheck="false" autocorrect="off"
+                  autocapitalize="off" autocomplete="off"></textarea>
+      </div>
+    </div>
   </div>
   <div class="panel">
-    <div class="panel-label">formatted output</div>
+    <div class="panel-label">salida formateada</div>
     <div id="output"></div>
   </div>
 </div>
 
-<div id="ast-bar" style="display:none">
-  <span>AST</span>
-  <div class="toggle" id="ast-toggle"></div>
+<div id="wbar" style="display:none">
+  <div id="wbar-hdr">
+    <span>Warnings</span><span class="wc" id="wc"></span>
+    <span class="wt" id="wt">▶</span>
+  </div>
+  <div id="wlist"></div>
 </div>
-<div id="ast-pane" id="ast-pane"></div>
+
+<div id="tooltip"></div>
+<div id="ac"></div>
 
 <script src="StonescriptParser.js"></script>
 <script>
 (async () => {
-  // Load API JSON
-  let api;
-  try {
-    const r = await fetch('stonescript-api.json');
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    api = await r.json();
-  } catch (e) {
-    document.getElementById('loading').textContent = 'Error: ' + e.message;
-    return;
+
+// ── Load API ────────────────────────────────────────────────
+let api;
+try {
+  const r = await fetch('stonescript-api.json');
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  api = await r.json();
+} catch(e) {
+  document.getElementById('loading').textContent = 'Error: ' + e.message;
+  return;
+}
+
+const parser = new StonescriptParser(api);
+
+document.getElementById('loading').style.display = 'none';
+['header','body','wbar'].forEach(id => document.getElementById(id).style.display = '');
+
+// ── Refs ────────────────────────────────────────────────────
+const inputEl  = document.getElementById('input');
+const hlEl     = document.getElementById('highlight');
+const gutterIn = document.getElementById('gutter-inner');
+const scrollEl = document.getElementById('editor-scroll');
+const outputEl = document.getElementById('output');
+const statusEl = document.getElementById('status');
+const tipEl    = document.getElementById('tooltip');
+const acEl     = document.getElementById('ac');
+const wbar     = document.getElementById('wbar');
+const wlist    = document.getElementById('wlist');
+const wcEl     = document.getElementById('wc');
+const wtEl     = document.getElementById('wt');
+
+// ── AC data ─────────────────────────────────────────────────
+const acData = api.filter(e =>
+  !['operator','control_flow','comment','line_continuation','enum','syntax'].includes(e.type)
+).map(e => ({ id: e.id, type: e.type, ret: e.return_type || '' }));
+
+// ── State ───────────────────────────────────────────────────
+let activeLine = 0;
+let warnings   = [];
+let acItems    = [];
+let acSel      = 0;
+let acOpen     = false;
+let rafPending = false;
+
+// ── Gutter scroll sync ───────────────────────────────────────
+scrollEl.addEventListener('scroll', () => {
+  gutterIn.style.transform = `translateY(-${scrollEl.scrollTop}px)`;
+});
+
+// ── Render (rAF-throttled) ───────────────────────────────────
+function scheduleRender() {
+  if (!rafPending) { rafPending = true; requestAnimationFrame(doRender); }
+}
+
+function doRender() {
+  rafPending = false;
+  const code  = inputEl.value;
+  const lines = code.split('\n');
+
+  let blocks = [], colorHtml = '';
+  warnings = [];
+  if (code.trim()) {
+    try {
+      blocks    = parser.parse(code);
+      colorHtml = parser.toHtml(blocks);
+      warnings  = collectWarnings(blocks, lines);
+    } catch(e) {
+      colorHtml = esc(code);
+    }
   }
 
-  const parser = new StonescriptParser(api);
+  // Status
+  const wn = warnings.length;
+  statusEl.textContent = wn ? wn + ' warning' + (wn > 1 ? 's' : '') : (code.trim() ? 'ok' : '');
+  statusEl.className   = wn ? 'err' : (code.trim() ? 'ok' : '');
 
-  // Hide loading, show UI
-  document.getElementById('loading').style.display = 'none';
-  document.getElementById('header').style.display  = '';
-  document.getElementById('body').style.display    = '';
-  document.getElementById('ast-bar').style.display = '';
+  outputEl.innerHTML = colorHtml;
+  buildHighlight(lines, colorHtml);
+  buildGutter(lines);
+  buildWarnPanel();
+}
 
-  const inputEl  = document.getElementById('input');
-  const outputEl = document.getElementById('output');
-  const statusEl = document.getElementById('status');
-  const astPane  = document.getElementById('ast-pane');
-  const astToggle= document.getElementById('ast-toggle');
-
-  // AST toggle
-  document.getElementById('ast-bar').addEventListener('click', () => {
-    astPane.classList.toggle('open');
-    astToggle.classList.toggle('open');
-  });
-
-  let debounce;
-  function update() {
-    clearTimeout(debounce);
-    debounce = setTimeout(() => {
-      const code = inputEl.value;
-      if (!code.trim()) {
-        outputEl.innerHTML = '';
-        astPane.textContent = '';
-        statusEl.textContent = '';
-        statusEl.className = '';
-        return;
+// ── Collect warnings ─────────────────────────────────────────
+function collectWarnings(blocks, lines) {
+  const out = [];
+  (function walk(bs) {
+    for (const b of bs) {
+      if (b.warnings && b.warnings.length) {
+        const ln = matchLine(b.raw, lines);
+        b.warnings.forEach(w => out.push({ line: ln, message: w.message }));
       }
-      try {
-        const blocks  = parser.parse(code);
-        const html    = parser.toHtml(blocks);
-        outputEl.innerHTML = html;
+      if (b.children) walk(b.children);
+    }
+  })(blocks);
+  return out;
+}
 
-        // Count all warnings
-        function countWarns(bs) {
-          return bs.reduce((n, b) => n + b.warnings.length + countWarns(b.children), 0);
-        }
-        const wn = countWarns(blocks);
-        statusEl.textContent = wn > 0 ? `${wn} warning${wn>1?'s':''}` : 'ok';
-        statusEl.className   = wn > 0 ? 'err' : 'ok';
+function matchLine(raw, lines) {
+  if (!raw) return 0;
+  const t = raw.trim();
+  for (let i = 0; i < lines.length; i++)
+    if (lines[i].trim() === t) return i;
+  return 0;
+}
 
-        astPane.textContent = JSON.stringify(blocks, null, 2);
-      } catch (e) {
-        outputEl.textContent = 'Parser error: ' + e.message;
-        statusEl.textContent = 'error';
-        statusEl.className   = 'err';
-        console.error(e);
-      }
-    }, 120);
+// ── Highlight layer ──────────────────────────────────────────
+function buildHighlight(lines, colorHtml) {
+  const warnSet    = new Set(warnings.map(w => w.line));
+  const colorLines = colorHtml.split('\n');
+  while (colorLines.length < lines.length) colorLines.push('');
+
+  let html = '';
+  for (let i = 0; i < lines.length; i++) {
+    let cls = 'hl-line';
+    if (i === activeLine) cls += ' active';
+    if (warnSet.has(i))   cls += ' warn';
+    // \u200b = zero-width space: keeps empty lines at correct height
+    const content = colorLines[i] || '\u200b';
+    html += `<span class="${cls}">${content}\n</span>`;
   }
+  // Extra line so last-line caret has room
+  html += '<span class="hl-line">\u200b</span>';
+  hlEl.innerHTML = html;
 
-  inputEl.addEventListener('input', update);
+  // Sync textarea minimum height to highlight content height
+  const lh = lhPx();
+  const minH = Math.max(scrollEl.clientHeight, (lines.length + 1) * lh + 24);
+  hlEl.style.minHeight    = minH + 'px';
+  inputEl.style.minHeight = minH + 'px';
+}
 
-  // Default example
-  inputEl.value = `?foe=boss
- equipR ice sword D
+// ── Gutter ───────────────────────────────────────────────────
+function buildGutter(lines) {
+  const warnSet = new Set(warnings.map(w => w.line));
+  let html = '';
+  for (let i = 0; i < lines.length; i++) {
+    let cls = 'gn';
+    if (i === activeLine) cls += ' act';
+    if (warnSet.has(i))   cls += ' warn';
+    html += `<span class="${cls}" data-ln="${i}">${i + 1}</span>`;
+  }
+  gutterIn.innerHTML = html;
+}
+
+// ── Warn panel ───────────────────────────────────────────────
+function buildWarnPanel() {
+  wcEl.textContent = warnings.length || '';
+  wlist.innerHTML = warnings.map(w =>
+    `<div class="we" data-ln="${w.line}">
+       <span class="we-ln">L${w.line+1}</span>
+       <span>${esc(w.message)}</span>
+     </div>`
+  ).join('');
+  wlist.querySelectorAll('.we').forEach(el =>
+    el.addEventListener('click', () => goToLine(+el.dataset.ln))
+  );
+}
+
+function goToLine(ln) {
+  const lines = inputEl.value.split('\n');
+  let pos = 0;
+  for (let i = 0; i < Math.min(ln, lines.length); i++) pos += lines[i].length + 1;
+  inputEl.focus();
+  inputEl.setSelectionRange(pos, pos);
+  activeLine = ln;
+  scrollEl.scrollTop = Math.max(0, ln * lhPx() - scrollEl.clientHeight / 2);
+  scheduleRender();
+}
+
+// ── Warn bar toggle ──────────────────────────────────────────
+document.getElementById('wbar-hdr').addEventListener('click', () => {
+  wbar.classList.toggle('open');
+  wtEl.textContent = wbar.classList.contains('open') ? '▼' : '▶';
+});
+
+// ── Tooltips ─────────────────────────────────────────────────
+gutterIn.addEventListener('mousemove', e => {
+  const el = e.target.closest('.gn.warn');
+  if (!el) { hideTip(); return; }
+  const msgs = warnings.filter(w => w.line === +el.dataset.ln).map(w => w.message);
+  showTip(e, msgs.join('\n'));
+});
+gutterIn.addEventListener('mouseleave', hideTip);
+
+outputEl.addEventListener('mousemove', e => {
+  const el = e.target.closest('.warning');
+  if (!el) { hideTip(); return; }
+  showTip(e, el.dataset.warning || el.textContent);
+});
+outputEl.addEventListener('mouseleave', hideTip);
+
+function showTip(e, text) {
+  tipEl.textContent = text;
+  tipEl.style.display = 'block';
+  const x = e.clientX + 12, y = e.clientY - tipEl.offsetHeight - 6;
+  tipEl.style.left = Math.min(x, innerWidth  - tipEl.offsetWidth  - 8) + 'px';
+  tipEl.style.top  = Math.max(4, y) + 'px';
+}
+function hideTip() { tipEl.style.display = 'none'; }
+
+// ── Active line ──────────────────────────────────────────────
+function updateActiveLine() {
+  activeLine = inputEl.value.slice(0, inputEl.selectionStart).split('\n').length - 1;
+}
+
+// ── Autocomplete ─────────────────────────────────────────────
+function wordAtCursor() {
+  const pos = inputEl.selectionStart, v = inputEl.value;
+  let s = pos;
+  while (s > 0 && /[a-zA-Z0-9_.]/.test(v[s-1])) s--;
+  return { word: v.slice(s, pos), start: s, end: pos };
+}
+
+function triggerAC() {
+  const { word } = wordAtCursor();
+  if (word.length < 1) { closeAC(); return; }
+  const lc = word.toLowerCase();
+  const matches = acData
+    .filter(e => e.id.toLowerCase().includes(lc))
+    .sort((a, b) => {
+      const ap = a.id.toLowerCase().startsWith(lc) ? 0 : 1;
+      const bp = b.id.toLowerCase().startsWith(lc) ? 0 : 1;
+      return ap - bp || a.id.length - b.id.length;
+    })
+    .slice(0, 40);
+  if (!matches.length) { closeAC(); return; }
+  acItems = matches; acSel = 0; acOpen = true;
+  renderAC(); positionAC();
+}
+
+function renderAC() {
+  const { word } = wordAtCursor();
+  acEl.innerHTML = acItems.map((it, i) =>
+    `<div class="aci${i===acSel?' sel':''}" data-i="${i}">
+       <span class="aci-name">${hlMatch(it.id, word)}</span>
+       <span class="aci-kind">${it.type}${it.ret?' → '+it.ret:''}</span>
+     </div>`
+  ).join('');
+  acEl.querySelectorAll('.aci').forEach(el =>
+    el.addEventListener('mousedown', e => { e.preventDefault(); applyAC(+el.dataset.i); })
+  );
+  acEl.style.display = 'block';
+}
+
+function positionAC() {
+  const lh   = lhPx();
+  const rect = scrollEl.getBoundingClientRect();
+  const padT = parseFloat(getComputedStyle(hlEl).paddingTop) || 12;
+  const padL = parseFloat(getComputedStyle(hlEl).paddingLeft) || 14;
+  const x = rect.left + padL;
+  const y = rect.top + padT + (activeLine + 1) * lh - scrollEl.scrollTop;
+  acEl.style.left = Math.min(x, innerWidth  - 260) + 'px';
+  acEl.style.top  = Math.min(y, innerHeight - 220) + 'px';
+}
+
+function moveAC(d) {
+  if (!acOpen) return false;
+  acSel = Math.max(0, Math.min(acItems.length-1, acSel+d));
+  acEl.querySelectorAll('.aci').forEach((el,i) => el.classList.toggle('sel', i===acSel));
+  acEl.querySelector('.aci.sel')?.scrollIntoView({ block:'nearest' });
+  return true;
+}
+
+function applyAC(idx) {
+  if (idx === undefined) idx = acSel;
+  const item = acItems[idx]; if (!item) return;
+  const { word, start, end } = wordAtCursor();
+  const v = inputEl.value;
+  inputEl.value = v.slice(0, start) + item.id + v.slice(end);
+  const p = start + item.id.length;
+  inputEl.setSelectionRange(p, p);
+  closeAC(); updateActiveLine(); scheduleRender();
+}
+
+function closeAC() { acOpen = false; acEl.style.display = 'none'; }
+
+function hlMatch(str, q) {
+  if (!q) return esc(str);
+  const i = str.toLowerCase().indexOf(q.toLowerCase());
+  if (i < 0) return esc(str);
+  return esc(str.slice(0,i))
+    + `<span class="aci-m">${esc(str.slice(i,i+q.length))}</span>`
+    + esc(str.slice(i+q.length));
+}
+
+// ── Input events ─────────────────────────────────────────────
+inputEl.addEventListener('input', () => {
+  updateActiveLine(); triggerAC(); scheduleRender();
+});
+
+inputEl.addEventListener('keydown', e => {
+  if (acOpen) {
+    if (e.key === 'ArrowDown')              { e.preventDefault(); moveAC(1);  return; }
+    if (e.key === 'ArrowUp')                { e.preventDefault(); moveAC(-1); return; }
+    if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); applyAC(); return; }
+    if (e.key === 'Escape')                 { e.preventDefault(); closeAC(); return; }
+  }
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const s = inputEl.selectionStart, en = inputEl.selectionEnd;
+    inputEl.value = inputEl.value.slice(0, s) + '  ' + inputEl.value.slice(en);
+    inputEl.setSelectionRange(s+2, s+2);
+    updateActiveLine(); scheduleRender();
+  }
+});
+
+inputEl.addEventListener('keyup',  () => { updateActiveLine(); scheduleRender(); });
+inputEl.addEventListener('click',  () => { updateActiveLine(); closeAC(); scheduleRender(); });
+inputEl.addEventListener('select', () => { updateActiveLine(); scheduleRender(); });
+inputEl.addEventListener('paste',  () => { setTimeout(() => { updateActiveLine(); scheduleRender(); }, 0); });
+
+document.addEventListener('mousedown', e => {
+  if (!acEl.contains(e.target) && e.target !== inputEl) closeAC();
+});
+
+// ── Resize observer ──────────────────────────────────────────
+new ResizeObserver(scheduleRender).observe(scrollEl);
+
+// ── Utilities ────────────────────────────────────────────────
+function lhPx() {
+  const v = parseFloat(getComputedStyle(hlEl).lineHeight);
+  return isNaN(v) ? 21 : v;
+}
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Default code ─────────────────────────────────────────────
+inputEl.value = `?foe=boss
+  equipR ice sword D
   activate P
 ?loc=caves
   loadout 1
@@ -303,7 +610,10 @@ var x = 0
 x++
 ?
 equipR sword`;
-  update();
+
+updateActiveLine();
+scheduleRender();
+
 })();
 </script>
 </body>
