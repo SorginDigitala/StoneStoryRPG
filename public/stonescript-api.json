@@ -406,16 +406,33 @@
     "examples": [
       "activate R"
     ],
-    "valid_values": [
-      "L",
-      "P",
-      "R",
-      "cinderwisp",
-      "left",
-      "potion",
-      "right"
-    ],
-    "valid_values_note": "ability_id: one of the listed values or any item id string"
+    "arg_type": "ability_id",
+    "arg_validation": {
+      "fixed_values": [
+        "l",
+        "left",
+        "p",
+        "potion",
+        "r",
+        "right"
+      ],
+      "known_ability_ids": [
+        "bardiche",
+        "bash",
+        "cinderwisp",
+        "compound",
+        "dash",
+        "fire",
+        "fire_talisman",
+        "mind",
+        "mind_stone",
+        "staff_fire"
+      ],
+      "case_insensitive": true,
+      "charset": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+      "charset_desc": "Solo letras a-z A-Z, digitos 0-9 y guion bajo. Sin espacios ni acentos.",
+      "note": "fixed_values son siempre validos. known_ability_ids son IDs conocidos de habilidades de items. Cualquier valor que cumpla charset tambien se acepta como ability ID de item personalizado, pero no estara en la lista de conocidos."
+    }
   },
   {
     "id": "brew",
@@ -4512,15 +4529,6 @@
       "ui",
       "utc"
     ],
-    "valid_ability_ids": [
-      "L",
-      "P",
-      "R",
-      "cinderwisp",
-      "left",
-      "potion",
-      "right"
-    ],
     "valid_statement_types": [
       "command",
       "keyword",
@@ -4558,6 +4566,7 @@
       "new",
       "return",
       "var"
-    ]
+    ],
+    "ability_id_source": "activate.arg_validation"
   }
 ]

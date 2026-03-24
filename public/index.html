@@ -46,9 +46,11 @@ body{background:var(--bg);color:#bbb;font-family:var(--font);font-size:var(--fs)
 .print{color:#9acdaa;font-weight:bold;}.variable{color:#c8c8c8;}.function{color:#5ab4d4;}
 .operator{color:#777;}.number{color:#c5b07a;}.string{color:#8a7a6a;}
 .identifier{color:#aaa;}.paren{color:#555;}.bracket{color:#555;}
+/* warnings: sólo color de fondo en la línea, sin texto extra en el highlight */
 #tooltip{position:fixed;z-index:300;background:#180c0c;border:1px solid #c96b6b55;color:var(--err);font-size:11px;font-family:var(--font);padding:5px 10px;border-radius:2px;pointer-events:none;display:none;max-width:360px;white-space:normal;line-height:1.5;}
 #ac{position:fixed;z-index:200;background:#141618;border:1px solid #2a3035;border-radius:3px;display:none;max-height:210px;overflow-y:auto;min-width:230px;box-shadow:0 8px 24px rgba(0,0,0,.65);}
 #ac::-webkit-scrollbar{width:4px;}#ac::-webkit-scrollbar-thumb{background:#222;}
+#loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:11px;color:#333;letter-spacing:.14em;}
 .aci{display:flex;align-items:baseline;gap:10px;padding:5px 11px;cursor:pointer;font-size:12px;border-bottom:1px solid #1a1c1e;font-family:var(--font);}
 .aci:last-child{border-bottom:none;}.aci:hover,.aci.sel{background:#1e2428;}
 .aci-name{color:#c8c8c8;font-weight:bold;min-width:130px;}
@@ -60,18 +62,11 @@ body{background:var(--bg);color:#bbb;font-family:var(--font);font-size:var(--fs)
 #wlist{max-height:144px;overflow-y:auto;}#wlist::-webkit-scrollbar{width:4px;}#wlist::-webkit-scrollbar-thumb{background:#222;}
 .we{display:flex;gap:10px;padding:3px 12px;cursor:pointer;font-size:11px;color:#664444;font-family:var(--font);}
 .we:hover{background:#160c0c;color:var(--err);}.we-ln{color:#553333;min-width:38px;}
-#loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:11px;color:#333;letter-spacing:.14em;}
 </style>
 </head>
 <body>
-
 <div id="loading">cargando stonescript-api.json…</div>
-
-<div id="header" style="display:none">
-  <h1>·:·:· STONESCRIPT EDITOR ·:·:·</h1>
-  <div id="status"></div>
-</div>
-
+<div id="header" style="display:none"><h1>·:·:· STONESCRIPT EDITOR ·:·:·</h1><div id="status"></div></div>
 <div id="body" style="display:none">
   <div id="editor-outer">
     <div id="gutter"><div id="gutter-inner"></div></div>
@@ -81,12 +76,10 @@ body{background:var(--bg);color:#bbb;font-family:var(--font);font-size:var(--fs)
     </div>
   </div>
 </div>
-
 <div id="wbar" style="display:none">
   <div id="wbar-hdr"><span>Warnings</span><span class="wc" id="wc"></span><span class="wt" id="wt">▶</span></div>
   <div id="wlist"></div>
 </div>
-
 <div id="tooltip"></div>
 <div id="ac"></div>
 
@@ -100,53 +93,13 @@ try {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   api = await r.json();
 } catch(e) {
-  document.getElementById('loading').textContent = 'Error: ' + e.message;
+  document.getElementById('loading').textContent = 'Error cargando API: ' + e.message;
   return;
 }
 
 document.getElementById('loading').style.display = 'none';
 ['header','body','wbar'].forEach(id => document.getElementById(id).style.display = '');
 
-const _DEFAULT = `// Cuando se activa, la piedra sigue
-// continuamente las instrucciones que se le
-// indiquen.
-// Estas deben grabarse en petroscripto.
-// Más información en:
-// StoneStoryRPG.com/stonescript
-// (Bezerra, el Sabio)
-
-import UI/MindstoneButton
-
-?loc=caves
- ?loc.begin
-  brew tar
-  equipR compound
-  equipL trisk
- :?DBash()
-  return
- :?hp<=foe.damage
-  activate P
-:?loc=rocky
- loc.Leave()
-
-
-func DBash()
- return Dash() | Bash()
-func BDash()
- return Bash() | Dash()
-func Dash()
- return Shield("dash")
-func Bash()
- return Shield("bash")
-
-func Shield(s)
- ?item.GetCooldown(s)<=0 & foe.distance>10 & foe.distance<17
-  equipR @s@
-  equipl trisk
-  return true
- return false
-
-`;
 
 const parser   = new StonescriptParser(api);
 const inputEl  = document.getElementById('input');
@@ -162,15 +115,26 @@ const wlist    = document.getElementById('wlist');
 const wcEl     = document.getElementById('wc');
 const wtEl     = document.getElementById('wt');
 
+// ── AC data ──────────────────────────────────────────────────
 const acData = api
   .filter(e => !['operator','control_flow','comment','line_continuation','enum','syntax'].includes(e.type))
   .map(e => ({id:e.id, type:e.type, ret:e.return_type||''}));
 
-let activeLine = 0, warnings = [], acItems = [], acSel = 0, acOpen = false, rafPending = false, LH = 21;
+// ── State ────────────────────────────────────────────────────
+let activeLine = 0;
+let warnings   = [];
+let acItems    = [];
+let acSel      = 0;
+let acOpen     = false;
+let rafPending = false;
+let LH         = 21;  // line height in px, measured below
 
+// ── Measure real line height ─────────────────────────────────
 function measureLH() {
   const tmp = document.createElement('div');
-  tmp.style.cssText = "position:absolute;visibility:hidden;pointer-events:none;font-family:'Courier New',Courier,monospace;font-size:13px;line-height:1.65;padding:0;margin:0;white-space:pre;";
+  tmp.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;' +
+    'font-family:\'Courier New\',Courier,monospace;font-size:13px;line-height:1.65;' +
+    'padding:0;margin:0;white-space:pre;';
   tmp.textContent = 'X';
   document.body.appendChild(tmp);
   LH = tmp.getBoundingClientRect().height;
@@ -178,10 +142,12 @@ function measureLH() {
 }
 measureLH();
 
+// ── Gutter width: fit widest line number ─────────────────────
 function updateGutterWidth(lineCount) {
   const digits = String(lineCount).length;
   const tmp = document.createElement('span');
-  tmp.style.cssText = "position:absolute;visibility:hidden;pointer-events:none;font-family:'Courier New',Courier,monospace;font-size:11px;";
+  tmp.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none;' +
+    'font-family:\'Courier New\',Courier,monospace;font-size:11px;';
   tmp.textContent = '0'.repeat(Math.max(digits, 2));
   document.body.appendChild(tmp);
   const w = Math.ceil(tmp.getBoundingClientRect().width) + 22;
@@ -189,18 +155,23 @@ function updateGutterWidth(lineCount) {
   gutterEl.style.width = w + 'px';
 }
 
+// ── Scroll sync ───────────────────────────────────────────────
 scrollEl.addEventListener('scroll', () => {
   gutterIn.style.transform = `translateY(-${scrollEl.scrollTop}px)`;
 });
 
+// ── Schedule render ───────────────────────────────────────────
 function scheduleRender() {
   if (!rafPending) { rafPending = true; requestAnimationFrame(doRender); }
 }
 
+// ── Render ────────────────────────────────────────────────────
 function doRender() {
   rafPending = false;
   const code  = inputEl.value;
   const lines = code.split('\n');
+
+  // Parse full AST for warnings (context-aware)
   warnings = [];
   if (code.trim()) {
     try {
@@ -208,23 +179,42 @@ function doRender() {
       warnings = collectWarnings(blocks, lines);
     } catch(e) {}
   }
+
   const wn = warnings.length;
   statusEl.textContent = wn ? wn + ' warning' + (wn > 1 ? 's' : '') : (code.trim() ? 'ok' : '');
   statusEl.className   = wn ? 'err' : (code.trim() ? 'ok' : '');
+
   updateGutterWidth(lines.length);
-  buildHighlight(lines, renderLineByLine(lines));
+
+  // Render highlight LINE BY LINE — guarantees 1 code line = 1 HTML line
+  // even when lines are empty or whitespace-only.
+  const colorLines = renderLineByLine(lines);
+
+  buildHighlight(lines, colorLines);
   buildGutter(lines);
   buildWarnPanel();
 }
 
+// ── Line-by-line renderer ─────────────────────────────────────
+// Parses each line independently so empty/whitespace lines produce
+// an empty string (not omitted), keeping code ↔ highlight in sync.
+// Warning characters (⚠ ?) are stripped so no extra characters
+// appear in the highlight that would shift the textarea cursor.
 function renderLineByLine(lines) {
   return lines.map(line => {
-    if (!line.trim()) return '';
-    try { return renderBlocksNoWarnText(parser.parse(line)); }
-    catch(e) { return esc(line); }
+    if (!line.trim()) return '';   // blank/whitespace → empty, preserves position
+    try {
+      const blocks = parser.parse(line);
+      // Render tokens only — no warning text characters
+      return renderBlocksNoWarnText(blocks);
+    } catch(e) {
+      return esc(line);
+    }
   });
 }
 
+// Render blocks to HTML, omitting the ⚠/? warning text characters
+// that _warnSpan() produces. Warning context comes from the full AST.
 function renderBlocksNoWarnText(blocks) {
   function blockHtml(b) {
     if (b.type === 'empty') return '';
@@ -232,20 +222,24 @@ function renderBlocksNoWarnText(blocks) {
     const toks   = b.tokens.map(([type, value]) =>
       type === 'space' ? esc(value || ' ') : `<span class="${type}">${esc(value)}</span>`
     ).join('');
+    // children inline on same "line" for single-line parse
     const kids = b.children.map(blockHtml).filter(Boolean).join('\n');
     return indent + toks + (kids ? '\n' + kids : '');
   }
   return blocks.map(blockHtml).filter(Boolean).join('\n');
 }
 
+// ── Collect warnings ─────────────────────────────────────────
 function collectWarnings(blocks, lines) {
   const out = [];
   (function walk(bs) {
     for (const b of bs) {
       if (b.warnings && b.warnings.length) {
         const t = b.raw ? b.raw.trim() : '';
-        let ln = 0;
-        for (let i = 0; i < lines.length; i++) if (lines[i].trim() === t) { ln = i; break; }
+        let ln  = 0;
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].trim() === t) { ln = i; break; }
+        }
         b.warnings.forEach(w => out.push({line: ln, message: w.message}));
       }
       if (b.children) walk(b.children);
@@ -254,6 +248,7 @@ function collectWarnings(blocks, lines) {
   return out;
 }
 
+// ── Build highlight ───────────────────────────────────────────
 function buildHighlight(lines, colorLines) {
   const warnSet = new Set(warnings.map(w => w.line));
   let html = '';
@@ -261,16 +256,19 @@ function buildHighlight(lines, colorLines) {
     let cls = 'hl-line';
     if (i === activeLine) cls += ' active';
     if (warnSet.has(i))   cls += ' warn';
+    // ​ keeps empty lines at full line-height
     html += `<span class="${cls}">${colorLines[i] || '\u200b'}\n</span>`;
   }
   html += '<span class="hl-line">\u200b</span>';
   hlEl.innerHTML = html;
+
   const padPx = parseFloat(getComputedStyle(hlEl).paddingTop) || 12;
   const minH  = Math.max(scrollEl.clientHeight, padPx * 2 + (lines.length + 1) * LH);
   hlEl.style.minHeight    = minH + 'px';
   inputEl.style.minHeight = minH + 'px';
 }
 
+// ── Build gutter ──────────────────────────────────────────────
 function buildGutter(lines) {
   const warnSet = new Set(warnings.map(w => w.line));
   let html = '';
@@ -283,10 +281,13 @@ function buildGutter(lines) {
   gutterIn.innerHTML = html;
 }
 
+// ── Build warn panel ──────────────────────────────────────────
 function buildWarnPanel() {
   wcEl.textContent = warnings.length || '';
   wlist.innerHTML  = warnings.map(w =>
-    `<div class="we" data-ln="${w.line}"><span class="we-ln">L${w.line + 1}</span><span>${esc(w.message)}</span></div>`
+    `<div class="we" data-ln="${w.line}">` +
+    `<span class="we-ln">L${w.line + 1}</span>` +
+    `<span>${esc(w.message)}</span></div>`
   ).join('');
   wlist.querySelectorAll('.we').forEach(el =>
     el.addEventListener('click', () => goToLine(+el.dataset.ln))
@@ -305,11 +306,13 @@ function goToLine(ln) {
   scheduleRender();
 }
 
+// ── Warn bar toggle ───────────────────────────────────────────
 document.getElementById('wbar-hdr').addEventListener('click', () => {
   wbar.classList.toggle('open');
-  wtEl.textContent = wbar.classList.contains('open') ? '\u25bc' : '\u25b6';
+  wtEl.textContent = wbar.classList.contains('open') ? '▼' : '▶';
 });
 
+// ── Tooltips ──────────────────────────────────────────────────
 gutterIn.addEventListener('mousemove', e => {
   const el = e.target.closest('.gn.warn');
   if (!el) { hideTip(); return; }
@@ -327,10 +330,12 @@ function showTip(e, text) {
 }
 function hideTip() { tipEl.style.display = 'none'; }
 
+// ── Active line ───────────────────────────────────────────────
 function updateActiveLine() {
   activeLine = inputEl.value.slice(0, inputEl.selectionStart).split('\n').length - 1;
 }
 
+// ── Autocomplete ──────────────────────────────────────────────
 function wordAtCursor() {
   const pos = inputEl.selectionStart, v = inputEl.value;
   let s = pos;
@@ -348,7 +353,8 @@ function triggerAC() {
       const ap = a.id.toLowerCase().startsWith(lc) ? 0 : 1;
       const bp = b.id.toLowerCase().startsWith(lc) ? 0 : 1;
       return ap - bp || a.id.length - b.id.length;
-    }).slice(0, 40);
+    })
+    .slice(0, 40);
   if (!matches.length) { closeAC(); return; }
   acItems = matches; acSel = 0; acOpen = true;
   renderAC(); positionAC();
@@ -359,7 +365,7 @@ function renderAC() {
   acEl.innerHTML = acItems.map((it, i) =>
     `<div class="aci${i === acSel ? ' sel' : ''}" data-i="${i}">` +
     `<span class="aci-name">${hlMatch(it.id, word)}</span>` +
-    `<span class="aci-kind">${it.type}${it.ret ? ' \u2192 ' + it.ret : ''}</span></div>`
+    `<span class="aci-kind">${it.type}${it.ret ? ' → ' + it.ret : ''}</span></div>`
   ).join('');
   acEl.querySelectorAll('.aci').forEach(el =>
     el.addEventListener('mousedown', e => { e.preventDefault(); applyAC(+el.dataset.i); })
@@ -399,10 +405,15 @@ function hlMatch(str, q) {
   if (!q) return esc(str);
   const i = str.toLowerCase().indexOf(q.toLowerCase());
   if (i < 0) return esc(str);
-  return esc(str.slice(0, i)) + `<span class="aci-m">${esc(str.slice(i, i + q.length))}</span>` + esc(str.slice(i + q.length));
+  return esc(str.slice(0, i))
+    + `<span class="aci-m">${esc(str.slice(i, i + q.length))}</span>`
+    + esc(str.slice(i + q.length));
 }
 
-inputEl.addEventListener('input', () => { updateActiveLine(); triggerAC(); scheduleRender(); });
+// ── Input events ──────────────────────────────────────────────
+inputEl.addEventListener('input', () => {
+  updateActiveLine(); triggerAC(); scheduleRender();
+});
 
 inputEl.addEventListener('keydown', e => {
   if (acOpen) {
@@ -411,6 +422,7 @@ inputEl.addEventListener('keydown', e => {
     if (e.key === 'Enter')     { e.preventDefault(); applyAC();  return; }
     if (e.key === 'Tab')       { e.preventDefault(); applyAC();  return; }
     if (e.key === 'Escape')    { e.preventDefault(); closeAC();  return; }
+    // Cursor movement: close AC but let the key act normally (NO return, NO preventDefault)
     if (['ArrowLeft','ArrowRight','Home','End'].includes(e.key)) { closeAC(); }
   }
   if (e.key === 'Tab' && !acOpen) {
@@ -422,7 +434,11 @@ inputEl.addEventListener('keydown', e => {
   }
 });
 
-inputEl.addEventListener('keyup',  () => { updateActiveLine(); scheduleRender(); });
+inputEl.addEventListener('keyup', e => {
+  updateActiveLine();
+  scheduleRender();
+});
+
 inputEl.addEventListener('click',  () => { updateActiveLine(); closeAC(); scheduleRender(); });
 inputEl.addEventListener('select', () => { updateActiveLine(); scheduleRender(); });
 inputEl.addEventListener('paste',  () => { setTimeout(() => { updateActiveLine(); closeAC(); scheduleRender(); }, 0); });
@@ -431,15 +447,71 @@ document.addEventListener('mousedown', e => {
   if (!acEl.contains(e.target) && e.target !== inputEl) closeAC();
 });
 
+// ── Resize ────────────────────────────────────────────────────
 new ResizeObserver(() => { measureLH(); scheduleRender(); }).observe(scrollEl);
 
+// ── Utils ─────────────────────────────────────────────────────
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-inputEl.value = _DEFAULT;
+// ── Init ──────────────────────────────────────────────────────
+const _DEFAULT = `// Cuando se activa, la piedra sigue
+// continuamente las instrucciones que se le
+// indiquen.
+// Estas deben grabarse en petroscripto.
+// Más información en:
+// StoneStoryRPG.com/stonescript
+// (Bezerra, el Sabio)
+
+import UI/MindstoneButton
+import UI/BetterInfo2
+
+?loc=caves
+ ?loc.begin
+  brew tar
+  equipR compound
+  equipL trisk
+ :?DBash()
+  return
+ :?hp<=foe.damage
+  activate P
+:?loc=rocky
+ loc.Leave()
+
+
+func DBash()
+ return Dash() | Bash()
+func BDash()
+ return Bash() | Dash()
+func Dash()
+ return Shield("dash")
+func Bash()
+ return Shield("bash")
+
+func Shield(s)
+ ?item.GetCooldown(s)<=0 & foe.distance>10 & foe.distance<17
+  equipR @s@
+  equipl trisk
+  return true
+ return false`;
+
+// Carga desde el hash de la URL: editor.html#?foe="pallas"%0A  equipR sword
+// Para generar el enlace: location.hash = encodeURIComponent(tuCodigo)
+function loadFromHash() {
+  const hash = window.location.hash.slice(1);
+  if (!hash) return null;
+  try {
+    const decoded = decodeURIComponent(hash);
+    if (decoded && decoded.length > 0) return decoded;
+  } catch(e) {}
+  return null;
+}
+
+inputEl.value = loadFromHash() || _DEFAULT;
 updateActiveLine();
 scheduleRender();
+
 
 })();
 </script>

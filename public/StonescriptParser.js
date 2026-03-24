@@ -113,6 +113,13 @@ class StonescriptParser {
     if (this.byId['?'])      this.condValidate   = this.byId['?'].validate   || {};
     if (this.byId['import']) this.importValidate = this.byId['import'].validate || {};
     if (this.byId['var'])    this.varValidate    = this.byId['var'].validate  || {};
+
+    // Load activate validation from activate.arg_validation (data-driven)
+    const av = (this.byId['activate'] && this.byId['activate'].arg_validation) || {};
+    this.abilityFixed   = new Set((av.fixed_values      || []).map(v => v.toLowerCase()));
+    this.abilityKnown   = new Set((av.known_ability_ids || []).map(v => v.toLowerCase()));
+    this.abilityCharset = av.charset ? new RegExp(av.charset) : /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+    this.validAbilityIds = new Set([...this.abilityFixed, ...this.abilityKnown]);
   }
 
   // ── PUBLIC API ────────────────────────────────────────────
@@ -614,14 +621,39 @@ class StonescriptParser {
     return [];
   }
 
-  // Rule 6: activate
+  // Rule 6: activate — data-driven from activate.arg_validation in JSON
+  // fixed_values: always valid (l/r/p/left/right/potion)
+  // known_ability_ids: known item ability ids (bardiche, bash...)
+  // charset: what chars are allowed at all
   _checkActivate(arg) {
     if (!arg.trim()) return [];
-    if (/\s/.test(arg.trim()))
+    const val = arg.trim();
+    const lc  = val.toLowerCase();
+
+    // Multi-word: never valid
+    if (/\s/.test(val))
       return [this._warn(W.BAD_ACTIVATE,
-        `'${arg.trim()}' no es un ability ID valido. ` +
-        `Valores conocidos: ${[...this.validAbilityIds].join(', ')}, o un ID de item (una sola palabra).`)];
-    return [];
+        `'${val}' no puede contener espacios. ` +
+        `Fijos validos: ${[...this.abilityFixed].join(', ')}.`)];
+
+    // Charset check (from activate.arg_validation.charset in JSON)
+    if (!this.abilityCharset.test(val))
+      return [this._warn(W.BAD_ACTIVATE,
+        `'${val}' contiene caracteres no validos. ` +
+        `Solo se permiten letras a-z A-Z, digitos y _.`)];
+
+    // Fixed values are always valid (case-insensitive)
+    if (this.abilityFixed.has(lc)) return [];
+
+    // Known ability IDs are valid
+    if (this.abilityKnown.has(lc)) return [];
+
+    // Unknown — report error with both lists
+    const all = [...this.abilityFixed, ...this.abilityKnown].sort();
+    return [this._warn(W.BAD_ACTIVATE,
+      `'${val}' no es un ability ID reconocido. ` +
+      `Fijos: ${[...this.abilityFixed].join(', ')}. ` +
+      `Conocidos: ${[...this.abilityKnown].join(', ')}.`)];
   }
 
   // Dispatch keyword validations
