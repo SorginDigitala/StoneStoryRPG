@@ -1,0 +1,4613 @@
+[
+  {
+    "id": "?",
+    "type": "control_flow",
+    "syntax": "?<expr>",
+    "opens_block": true,
+    "follows": "expr",
+    "examples": [
+      "?loc = caves\n  loadout 1"
+    ],
+    "valid_operators": [
+      "=",
+      "!",
+      "&",
+      "|",
+      ">",
+      "<",
+      ">=",
+      "<=",
+      "! (negation)"
+    ],
+    "validate": {
+      "expression_required": true,
+      "no_keywords_as_operands": true,
+      "no_embedded_condition": true,
+      "no_bare_string": true,
+      "description": "La expresion de condicion debe usar operadores validos. No puede contener keywords (var, func...), strings sin operador, ni caracteres ? embebidos.",
+      "no_trailing_junk": true,
+      "no_trailing_junk_desc": "Tras el ultimo operando/valor de la condicion no puede haber palabras sueltas sin operador."
+    }
+  },
+  {
+    "id": ":",
+    "type": "control_flow",
+    "syntax": ":",
+    "opens_block": true,
+    "examples": [
+      "?loc = caves\n  loadout 1\n:\n  loadout 2"
+    ]
+  },
+  {
+    "id": ":?",
+    "type": "control_flow",
+    "syntax": ":?<expr>",
+    "opens_block": true,
+    "follows": "expr",
+    "examples": [
+      "?loc = caves\n  loadout 1\n:?loc = deadwood\n  loadout 2\n:\n  loadout 3"
+    ],
+    "valid_operators": [
+      "=",
+      "!",
+      "&",
+      "|",
+      ">",
+      "<",
+      ">=",
+      "<=",
+      "! (negation)"
+    ],
+    "validate": {
+      "expression_required": true,
+      "no_keywords_as_operands": true,
+      "no_embedded_condition": true,
+      "no_bare_string": true,
+      "description": "La expresion de condicion debe usar operadores validos. No puede contener keywords (var, func...), strings sin operador, ni caracteres ? embebidos.",
+      "no_trailing_junk": true,
+      "no_trailing_junk_desc": "Tras el ultimo operando/valor de la condicion no puede haber palabras sueltas sin operador."
+    }
+  },
+  {
+    "id": "//",
+    "type": "comment",
+    "syntax": "// <text>",
+    "follows": "text"
+  },
+  {
+    "id": "/* */",
+    "type": "comment",
+    "syntax": "/* <text> */",
+    "follows": "text",
+    "multiline": true
+  },
+  {
+    "id": "^",
+    "type": "line_continuation",
+    "syntax": "^<expr>",
+    "follows": "expr"
+  },
+  {
+    "id": "=",
+    "type": "operator",
+    "context": "comparison",
+    "examples": [
+      "?hp = maxhp\n  loadout 2"
+    ]
+  },
+  {
+    "id": "!",
+    "type": "operator",
+    "context": "comparison",
+    "examples": [
+      "?foe ! poison\n  equipL sword"
+    ]
+  },
+  {
+    "id": "&",
+    "type": "operator",
+    "context": "comparison",
+    "examples": [
+      "?loc=caves & foe=boss"
+    ]
+  },
+  {
+    "id": "|",
+    "type": "operator",
+    "context": "comparison",
+    "examples": [
+      "?foe=slow | foe.count>3\n  activate potion"
+    ]
+  },
+  {
+    "id": ">",
+    "type": "operator",
+    "context": "comparison",
+    "examples": [
+      "?foe.count > 10\n  equip shiny bardiche"
+    ]
+  },
+  {
+    "id": "<",
+    "type": "operator",
+    "context": "comparison",
+    "examples": [
+      "?hp < 6\n  activate potion"
+    ]
+  },
+  {
+    "id": ">=",
+    "type": "operator",
+    "context": "comparison",
+    "examples": [
+      "?loc.stars >= 6\n  equipR vigor shield"
+    ]
+  },
+  {
+    "id": "<=",
+    "type": "operator",
+    "context": "comparison",
+    "examples": [
+      "?hp <= 6\n  activate potion"
+    ]
+  },
+  {
+    "id": "! (negation)",
+    "type": "operator",
+    "context": "negation",
+    "examples": [
+      "? !ai.enabled\n  >The AI is not enabled."
+    ]
+  },
+  {
+    "id": "+",
+    "type": "operator",
+    "context": "math",
+    "examples": [
+      "var a = 2 + 3"
+    ]
+  },
+  {
+    "id": "-",
+    "type": "operator",
+    "context": "math",
+    "examples": [
+      "?hp < maxhp - 5\n  equip vigor sword dL"
+    ]
+  },
+  {
+    "id": "*",
+    "type": "operator",
+    "context": "math",
+    "examples": [
+      "var a = 2 * 0.4"
+    ]
+  },
+  {
+    "id": "/",
+    "type": "operator",
+    "context": "math",
+    "examples": [
+      "var a = 8\na = a / 4"
+    ]
+  },
+  {
+    "id": "++",
+    "type": "operator",
+    "context": "math",
+    "examples": [
+      "var a = 3\na++"
+    ]
+  },
+  {
+    "id": "--",
+    "type": "operator",
+    "context": "math",
+    "examples": [
+      "var a = 3\na--"
+    ]
+  },
+  {
+    "id": "%",
+    "type": "operator",
+    "context": "math",
+    "examples": [
+      "var a = 5 % 4"
+    ]
+  },
+  {
+    "id": "( )",
+    "type": "operator",
+    "context": "math",
+    "examples": [
+      "var a = 2 * (3 - 1)"
+    ]
+  },
+  {
+    "id": "var",
+    "type": "keyword",
+    "syntax": "var <name> [= <expr>]",
+    "follows": "identifier",
+    "examples": [
+      "var message = Hello World!\n>@message@"
+    ],
+    "validate": {
+      "identifier_pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+      "single_declaration": true,
+      "reserved_names": [
+        "Type",
+        "ai",
+        "ambient",
+        "anim",
+        "armor",
+        "array",
+        "b",
+        "bighead",
+        "buffs",
+        "button",
+        "canvas",
+        "color",
+        "component",
+        "debuffs",
+        "draw",
+        "encounter",
+        "event",
+        "face",
+        "foe",
+        "harvest",
+        "hp",
+        "input",
+        "int",
+        "item",
+        "key",
+        "loc",
+        "math",
+        "maxarmor",
+        "maxhp",
+        "music",
+        "panel",
+        "pickup",
+        "player",
+        "pos",
+        "res",
+        "rng",
+        "rngf",
+        "screen",
+        "storage",
+        "string",
+        "summon",
+        "sys",
+        "te",
+        "text",
+        "time",
+        "totalgp",
+        "totaltime",
+        "ui",
+        "utc"
+      ],
+      "no_junk_after_value": true
+    }
+  },
+  {
+    "id": "func",
+    "type": "keyword",
+    "syntax": "func <name>([params])",
+    "follows": "func_signature",
+    "opens_block": true,
+    "examples": [
+      "func Print(message)\n  >@message@\n\nPrint(Hello World!)"
+    ]
+  },
+  {
+    "id": "for",
+    "type": "keyword",
+    "syntax": "for <v> = <a>..<b>",
+    "follows": "for_expr",
+    "opens_block": true,
+    "examples": [
+      "for i = 1..5\n  >`0,@i@,i = @i@"
+    ]
+  },
+  {
+    "id": "for :",
+    "type": "keyword",
+    "syntax": "for <v> : <array>",
+    "follows": "for_expr",
+    "opens_block": true,
+    "examples": [
+      "var a = [1, 2, 3]\nfor value : a\n  n = n + value"
+    ]
+  },
+  {
+    "id": "return",
+    "type": "keyword",
+    "syntax": "return [<expr>]",
+    "follows": "expr",
+    "examples": [
+      "func NonBossDuration()\n  return totalTime - time"
+    ]
+  },
+  {
+    "id": "break",
+    "type": "keyword",
+    "syntax": "break",
+    "examples": [
+      "for i = 1..5\n  ?i = 3\n    break"
+    ]
+  },
+  {
+    "id": "continue",
+    "type": "keyword",
+    "syntax": "continue",
+    "examples": [
+      "for i = 1..5\n  ?i = 3\n    continue\n  n = n + i"
+    ]
+  },
+  {
+    "id": "import",
+    "type": "keyword",
+    "syntax": "import <script_path>",
+    "follows": "script_path",
+    "examples": [
+      "import Fishing"
+    ],
+    "validate": {
+      "no_spaces": true,
+      "non_empty": true,
+      "pattern": "^[a-zA-Z0-9_.-]+(/[a-zA-Z0-9_.-]+)*$",
+      "pattern_desc": "Ruta de archivo: segmentos separados por un solo /. Solo letras a-z A-Z, digitos, _ . -"
+    }
+  },
+  {
+    "id": "new",
+    "type": "keyword",
+    "syntax": "new <script_path>",
+    "follows": "script_path",
+    "examples": [
+      "var v = new Components/Vector\nv.Init(10, 5)"
+    ]
+  },
+  {
+    "id": "equip",
+    "type": "command",
+    "syntax": "equip <search_string>",
+    "follows": "search_string",
+    "examples": [
+      "equip vigor crossbow *8 +5"
+    ]
+  },
+  {
+    "id": "equipL",
+    "type": "command",
+    "syntax": "equipL <search_string>",
+    "follows": "search_string",
+    "examples": [
+      "equipL poison d_sword"
+    ]
+  },
+  {
+    "id": "equipR",
+    "type": "command",
+    "syntax": "equipR <search_string>",
+    "follows": "search_string",
+    "examples": [
+      "equipR vigor shield"
+    ]
+  },
+  {
+    "id": "loadout",
+    "type": "command",
+    "syntax": "loadout <n>",
+    "follows": "number",
+    "examples": [
+      "?loc = caves\n  loadout 1\n?loc = deadwood\n  loadout 2"
+    ]
+  },
+  {
+    "id": "activate",
+    "type": "command",
+    "syntax": "activate <ability>",
+    "follows": "ability_id",
+    "examples": [
+      "activate R"
+    ],
+    "arg_type": "ability_id",
+    "arg_validation": {
+      "fixed_values": [
+        "l",
+        "left",
+        "p",
+        "potion",
+        "r",
+        "right"
+      ],
+      "known_ability_ids": [
+        "bardiche",
+        "bash",
+        "cinderwisp",
+        "compound",
+        "dash",
+        "fire",
+        "fire_talisman",
+        "mind",
+        "mind_stone",
+        "staff_fire"
+      ],
+      "case_insensitive": true,
+      "charset": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+      "charset_desc": "Solo letras a-z A-Z, digitos 0-9 y guion bajo. Sin espacios ni acentos.",
+      "note": "fixed_values son siempre validos. known_ability_ids son IDs conocidos de habilidades de items. Cualquier valor que cumpla charset tambien se acepta como ability ID de item personalizado, pero no estara en la lista de conocidos."
+    }
+  },
+  {
+    "id": "brew",
+    "type": "command",
+    "syntax": "brew <ingredients>",
+    "follows": "ingredient_expr",
+    "examples": [
+      "?loc.begin\n  brew bronze + tar"
+    ]
+  },
+  {
+    "id": "play",
+    "type": "command",
+    "syntax": "play <sound_id> [<pitch>]",
+    "follows": "sound_id",
+    "args": [
+      {
+        "name": "sound",
+        "type": "sound_id",
+        "optional": false
+      },
+      {
+        "name": "pitch",
+        "type": "number",
+        "optional": true,
+        "default": 100
+      }
+    ],
+    "examples": [
+      "play buy",
+      "play buy 200"
+    ]
+  },
+  {
+    "id": ">",
+    "type": "command",
+    "group": "print",
+    "syntax": "> <str>",
+    "follows": "string",
+    "examples": [
+      ">Hello World!"
+    ]
+  },
+  {
+    "id": ">o",
+    "type": "command",
+    "group": "print",
+    "syntax": ">o<X>,<Y>[,#color],<str>",
+    "follows": "print_args",
+    "examples": [
+      ">o-6,3,#red,Let's go!"
+    ]
+  },
+  {
+    "id": ">`",
+    "type": "command",
+    "group": "print",
+    "syntax": ">`<X>,<Y>[,#color],<str>",
+    "follows": "print_args",
+    "examples": [
+      ">`0,1,#red,Score = @score@"
+    ]
+  },
+  {
+    "id": ">c",
+    "type": "command",
+    "group": "print",
+    "syntax": ">c<X>,<Y>[,#color],<str>",
+    "follows": "print_args",
+    "examples": [
+      ">c0,0,Hello World!"
+    ]
+  },
+  {
+    "id": ">f",
+    "type": "command",
+    "group": "print",
+    "syntax": ">f<X>,<Y>[,#color],<str>",
+    "follows": "print_args",
+    "examples": [
+      ">f-2,0,#ff0000,ascii\n##!\n-#·#-\n##¡\nasciiend"
+    ]
+  },
+  {
+    "id": ">h",
+    "type": "command",
+    "group": "print",
+    "syntax": ">h<X>,<Y>[,#color],<str>",
+    "follows": "print_args",
+    "examples": [
+      ">h-2,-3,#yellow,ascii\n##_\n#| |\n_|_|_\nasciiend"
+    ]
+  },
+  {
+    "id": ">(",
+    "type": "command",
+    "group": "print",
+    "syntax": ">( <face_expr>",
+    "follows": "string",
+    "examples": [
+      ">( OwO"
+    ]
+  },
+  {
+    "id": "disable abilities",
+    "type": "command",
+    "group": "disable_enable"
+  },
+  {
+    "id": "enable abilities",
+    "type": "command",
+    "group": "disable_enable"
+  },
+  {
+    "id": "disable banner",
+    "type": "command",
+    "group": "disable_enable"
+  },
+  {
+    "id": "enable banner",
+    "type": "command",
+    "group": "disable_enable"
+  },
+  {
+    "id": "disable hud",
+    "type": "command",
+    "group": "disable_enable",
+    "syntax": "disable hud [<opts>]",
+    "follows": "hud_opts",
+    "args": [
+      {
+        "name": "opts",
+        "type": "string",
+        "optional": true
+      }
+    ],
+    "examples": [
+      "disable hud",
+      "disable hud ru"
+    ]
+  },
+  {
+    "id": "enable hud",
+    "type": "command",
+    "group": "disable_enable",
+    "syntax": "enable hud [<opts>]",
+    "follows": "hud_opts",
+    "args": [
+      {
+        "name": "opts",
+        "type": "string",
+        "optional": true
+      }
+    ]
+  },
+  {
+    "id": "disable loadout input",
+    "type": "command",
+    "group": "disable_enable"
+  },
+  {
+    "id": "enable loadout input",
+    "type": "command",
+    "group": "disable_enable"
+  },
+  {
+    "id": "disable loadout print",
+    "type": "command",
+    "group": "disable_enable"
+  },
+  {
+    "id": "enable loadout print",
+    "type": "command",
+    "group": "disable_enable"
+  },
+  {
+    "id": "disable npcDialog",
+    "type": "command",
+    "group": "disable_enable"
+  },
+  {
+    "id": "enable npcDialog",
+    "type": "command",
+    "group": "disable_enable"
+  },
+  {
+    "id": "disable pause",
+    "type": "command",
+    "group": "disable_enable"
+  },
+  {
+    "id": "enable pause",
+    "type": "command",
+    "group": "disable_enable"
+  },
+  {
+    "id": "disable player",
+    "type": "command",
+    "group": "disable_enable"
+  },
+  {
+    "id": "enable player",
+    "type": "command",
+    "group": "disable_enable"
+  },
+  {
+    "id": "ascii",
+    "type": "keyword",
+    "syntax": "ascii\n<art>\nasciiend",
+    "opens_block": false,
+    "examples": [
+      ">`1,0,#green,ascii\n#.-.\n(   )\n#`-´\nasciiend"
+    ]
+  },
+  {
+    "id": "loc",
+    "type": "var",
+    "group": "loc",
+    "return_type": "string",
+    "examples": [
+      "?loc = caves\n  loadout 1"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "loc.id",
+    "type": "var",
+    "group": "loc",
+    "return_type": "string",
+    "examples": [
+      "var id\nid = loc.id\n>Exploring @id@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "loc.gp",
+    "type": "var",
+    "group": "loc",
+    "return_type": "number",
+    "examples": [
+      ">`0,1,Run GP = @loc.gp@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "loc.name",
+    "type": "var",
+    "group": "loc",
+    "return_type": "string",
+    "examples": [
+      ">Exploring @loc.name@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "loc.stars",
+    "type": "var",
+    "group": "loc",
+    "return_type": "number",
+    "examples": [
+      "?loc.stars=4\n  loadout 1"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "loc.begin",
+    "type": "var",
+    "group": "loc",
+    "return_type": "bool",
+    "examples": [
+      "?loc.begin\n  i = 0"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "loc.loop",
+    "type": "var",
+    "group": "loc",
+    "return_type": "bool",
+    "examples": [
+      "?loc.loop\n  loopCount++"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "loc.isQuest",
+    "type": "var",
+    "group": "loc",
+    "return_type": "bool",
+    "examples": [
+      "?loc.isQuest\n  >`0,1,We're in a special quest location"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "loc.averageTime",
+    "type": "var",
+    "group": "loc",
+    "return_type": "number",
+    "examples": [
+      ">`0,2,Average time = @loc.averageTime@ frames"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "loc.bestTime",
+    "type": "var",
+    "group": "loc",
+    "return_type": "number",
+    "examples": [
+      ">`0,1,Best time = @loc.bestTime@ frames"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "encounter.isElite",
+    "type": "var",
+    "group": "encounter",
+    "return_type": "bool",
+    "examples": [
+      ">`0,1,Elite = @encounter.isElite@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "encounter.eliteMod",
+    "type": "var",
+    "group": "encounter",
+    "return_type": "string",
+    "examples": [
+      ">`0,2,Modifier = @encounter.eliteMod@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "foe",
+    "type": "var",
+    "group": "foe",
+    "return_type": "string",
+    "examples": [
+      "?foe = boo\n  equip vigor staff"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "foe.id",
+    "type": "var",
+    "group": "foe",
+    "return_type": "string",
+    "sealed_group": true
+  },
+  {
+    "id": "foe.name",
+    "type": "var",
+    "group": "foe",
+    "return_type": "string",
+    "sealed_group": true
+  },
+  {
+    "id": "foe.damage",
+    "type": "var",
+    "group": "foe",
+    "return_type": "number",
+    "examples": [
+      ">`0,1,foe damage = @foe.damage@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "foe.distance",
+    "type": "var",
+    "group": "foe",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "foe.z",
+    "type": "var",
+    "group": "foe",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "foe.count",
+    "type": "var",
+    "group": "foe",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "foe.GetCount",
+    "type": "func",
+    "group": "foe",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "radius",
+        "type": "int",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "foe.hp",
+    "type": "var",
+    "group": "foe",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "foe.maxhp",
+    "type": "var",
+    "group": "foe",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "foe.armor",
+    "type": "var",
+    "group": "foe",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "foe.maxarmor",
+    "type": "var",
+    "group": "foe",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "foe.state",
+    "type": "var",
+    "group": "foe",
+    "return_type": "number",
+    "examples": [
+      "?foe.state = 0\n  >`0,0,Foe is asleep"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "foe.time",
+    "type": "var",
+    "group": "foe",
+    "return_type": "number",
+    "examples": [
+      ">`0,0,Foe = @foe.name@:@foe.state@,@foe.time@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "foe.level",
+    "type": "var",
+    "group": "foe",
+    "return_type": "number",
+    "examples": [
+      ">`0,0,Foe = @foe.name@ is level @foe.level@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "foe.buffs.count",
+    "type": "var",
+    "group": "foe.buffs",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "foe.buffs.string",
+    "type": "var",
+    "group": "foe.buffs",
+    "return_type": "string",
+    "examples": [
+      "?foe.buffs.count > 0\n  >`0,3,Foe buffs = @foe.buffs.string@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "foe.buffs.GetCount",
+    "type": "func",
+    "group": "foe.buffs",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "buffId",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "foe.buffs.GetTime",
+    "type": "func",
+    "group": "foe.buffs",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "buffId",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "foe.debuffs.count",
+    "type": "var",
+    "group": "foe.debuffs",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "foe.debuffs.string",
+    "type": "var",
+    "group": "foe.debuffs",
+    "return_type": "string",
+    "examples": [
+      "?foe.debuffs.count > 0\n  >`0,4,Foe debuffs = @foe.debuffs.string@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "foe.debuffs.GetCount",
+    "type": "func",
+    "group": "foe.debuffs",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "debuffId",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "examples": [
+      ">`0,1,Chill debuff count =\n^ @foe.debuffs.GetCount(\"debuff_chill\")@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "foe.debuffs.GetTime",
+    "type": "func",
+    "group": "foe.debuffs",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "debuffId",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "examples": [
+      ">`0,2,Chill debuff time =\n^ @foe.debuffs.GetTime(\"debuff_chill\")@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "buffs.count",
+    "type": "var",
+    "group": "player.buffs",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "buffs.string",
+    "type": "var",
+    "group": "player.buffs",
+    "return_type": "string",
+    "examples": [
+      "?buffs.count > 0\n  >`0,1,Player buffs = @buffs.string@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "buffs.GetCount",
+    "type": "func",
+    "group": "player.buffs",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "buffId",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "buffs.GetTime",
+    "type": "func",
+    "group": "player.buffs",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "buffId",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "buffs.oldest",
+    "type": "var",
+    "group": "player.buffs",
+    "return_type": "string",
+    "examples": [
+      ">`0,1,Oldest buff: @buffs.oldest@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "debuffs.count",
+    "type": "var",
+    "group": "player.debuffs",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "debuffs.string",
+    "type": "var",
+    "group": "player.debuffs",
+    "return_type": "string",
+    "examples": [
+      "?debuffs.count > 0\n  >`0,2,Player debuffs = @debuffs.string@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "debuffs.GetCount",
+    "type": "func",
+    "group": "player.debuffs",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "debuffId",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "debuffs.GetTime",
+    "type": "func",
+    "group": "player.debuffs",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "debuffId",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "debuffs.oldest",
+    "type": "var",
+    "group": "player.debuffs",
+    "return_type": "string",
+    "examples": [
+      ">`0,1,Oldest debuff: @debuffs.oldest@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "harvest",
+    "type": "var",
+    "group": "harvest",
+    "return_type": "string",
+    "examples": [
+      "?harvest=Boulder\n  equip shovel"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "harvest.distance",
+    "type": "var",
+    "group": "harvest",
+    "return_type": "number",
+    "examples": [
+      "?loc=Rocky & harvest.distance < 7\n  equip shovel"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "harvest.z",
+    "type": "var",
+    "group": "harvest",
+    "return_type": "number",
+    "examples": [
+      "?loc=Rocky & harvest.z > 5\n  equip shovel"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "input.x",
+    "type": "var",
+    "group": "input",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "input.y",
+    "type": "var",
+    "group": "input",
+    "return_type": "number",
+    "examples": [
+      "> (@input.x@, @input.y@)"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "item.left",
+    "type": "var",
+    "group": "item",
+    "return_type": "string",
+    "examples": [
+      ">`0,1,Left:@item.left@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "item.right",
+    "type": "var",
+    "group": "item",
+    "return_type": "string",
+    "examples": [
+      "?item.right = quarterstaff\n  activate R"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "item.left.gp",
+    "type": "var",
+    "group": "item",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "item.right.gp",
+    "type": "var",
+    "group": "item",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "item.left.id",
+    "type": "var",
+    "group": "item",
+    "return_type": "string",
+    "sealed_group": true
+  },
+  {
+    "id": "item.right.id",
+    "type": "var",
+    "group": "item",
+    "return_type": "string",
+    "sealed_group": true
+  },
+  {
+    "id": "item.left.state",
+    "type": "var",
+    "group": "item",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "item.left.time",
+    "type": "var",
+    "group": "item",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "item.right.state",
+    "type": "var",
+    "group": "item",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "item.right.time",
+    "type": "var",
+    "group": "item",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "item.potion",
+    "type": "var",
+    "group": "item",
+    "return_type": "string",
+    "examples": [
+      "?item.potion ! empty & item.potion = auto\n  activate potion"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "pickup",
+    "type": "var",
+    "group": "pickup",
+    "return_type": "string",
+    "examples": [
+      "?pickup\n  equip star stone\n:\n  loadout 1"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "pickup.distance",
+    "type": "var",
+    "group": "pickup",
+    "return_type": "number",
+    "examples": [
+      "?pickup.distance < 5\n  equipL star stone"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "pickup.z",
+    "type": "var",
+    "group": "pickup",
+    "return_type": "number",
+    "examples": [
+      "?pickup.z > 7\n  equipL star stone"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "armor",
+    "type": "var",
+    "group": "player",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "armor.f",
+    "type": "var",
+    "group": "player",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "hp",
+    "type": "var",
+    "group": "player",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "maxhp",
+    "type": "var",
+    "group": "player",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "maxarmor",
+    "type": "var",
+    "group": "player",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "pos.x",
+    "type": "var",
+    "group": "player",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "pos.y",
+    "type": "var",
+    "group": "player",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "pos.z",
+    "type": "var",
+    "group": "player",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "ai.enabled",
+    "type": "var",
+    "group": "player",
+    "return_type": "bool",
+    "sealed_group": true
+  },
+  {
+    "id": "ai.paused",
+    "type": "var",
+    "group": "player",
+    "return_type": "bool",
+    "sealed_group": true
+  },
+  {
+    "id": "ai.idle",
+    "type": "var",
+    "group": "player",
+    "return_type": "bool",
+    "sealed_group": true
+  },
+  {
+    "id": "ai.walking",
+    "type": "var",
+    "group": "player",
+    "return_type": "bool",
+    "sealed_group": true
+  },
+  {
+    "id": "bighead",
+    "type": "var",
+    "group": "player",
+    "return_type": "bool",
+    "sealed_group": true
+  },
+  {
+    "id": "face",
+    "type": "var",
+    "group": "player",
+    "return_type": "string",
+    "examples": [
+      "?face = \"^^\"\n  >Happy"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "key",
+    "type": "var",
+    "group": "player",
+    "return_type": "string",
+    "examples": [
+      ">@key@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "totalgp",
+    "type": "var",
+    "group": "player",
+    "return_type": "number",
+    "examples": [
+      ">My gear power = @totalgp@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "player.direction",
+    "type": "var",
+    "group": "player",
+    "return_type": "number",
+    "examples": [
+      "?player.direction = 1\n  >`0,0,Walking right\n:\n  >`0,0,Walking left"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "player.framesPerMove",
+    "type": "var",
+    "group": "player",
+    "return_type": "number",
+    "examples": [
+      ">`0,1,Player Movement: @player.framesPerMove@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "player.moveX",
+    "type": "var",
+    "group": "player",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "player.moveZ",
+    "type": "var",
+    "group": "player",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "player.moveAddX",
+    "type": "var",
+    "group": "player",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "player.moveAddZ",
+    "type": "var",
+    "group": "player",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "player.name",
+    "type": "var",
+    "group": "player",
+    "return_type": "string",
+    "examples": [
+      "var name\nname = player.name\nx = string.Size(name) / -2\n>o@x@,-2,@name@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "player.GetNextLegendName",
+    "type": "func",
+    "group": "player",
+    "return_type": "string",
+    "sealed_group": true
+  },
+  {
+    "id": "player.ShowScaredFace",
+    "type": "func",
+    "group": "player",
+    "return_type": "void",
+    "args": [
+      {
+        "name": "duration",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "?key = primaryBegin\n  player.ShowScaredFace(1)"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "res.stone",
+    "type": "var",
+    "group": "res",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "res.wood",
+    "type": "var",
+    "group": "res",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "res.tar",
+    "type": "var",
+    "group": "res",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "res.ki",
+    "type": "var",
+    "group": "res",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "res.bronze",
+    "type": "var",
+    "group": "res",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "res.crystals",
+    "type": "var",
+    "group": "res",
+    "return_type": "number",
+    "examples": [
+      ">`0,1,#magenta, ♦ @res.crystals@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "rng",
+    "type": "var",
+    "group": "rng",
+    "return_type": "number",
+    "examples": [
+      "?rng < 5000\n  >Heads!\n:\n  >Tails!",
+      "var n = min + rng % (max - min + 1)"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "rngf",
+    "type": "var",
+    "group": "rng",
+    "return_type": "float",
+    "examples": [
+      ">random float = @rngf@",
+      "var n = min + (max - min) * rngf"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "screen.i",
+    "type": "var",
+    "group": "screen",
+    "return_type": "number",
+    "examples": [
+      ">`0,0,Screen index = @screen.i@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "screen.x",
+    "type": "var",
+    "group": "screen",
+    "return_type": "number",
+    "examples": [
+      ">`0,0,Screen position X = @screen.x@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "screen.w",
+    "type": "var",
+    "group": "screen",
+    "return_type": "number",
+    "examples": [
+      "var sw = screen.w"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "screen.h",
+    "type": "var",
+    "group": "screen",
+    "return_type": "number",
+    "examples": [
+      "var sh = screen.h"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "summon.count",
+    "type": "var",
+    "group": "summon",
+    "return_type": "number",
+    "examples": [
+      "?summon.count = 0 &\n^ item.CanActivate()\n  equipL talisman\n  activate L"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "summon.GetId",
+    "type": "func",
+    "group": "summon",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "index",
+        "type": "int",
+        "optional": true,
+        "default": 0
+      }
+    ],
+    "examples": [
+      "?summon.GetId() ! \"cinderwisp\" &\n^ item.CanActivate()\n  equipR fire talisman\n  activate R"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "summon.GetName",
+    "type": "func",
+    "group": "summon",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "index",
+        "type": "int",
+        "optional": true,
+        "default": 0
+      }
+    ],
+    "examples": [
+      ">`0,1,Summon:@summon.GetName()@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "summon.GetVar",
+    "type": "func",
+    "group": "summon",
+    "return_type": "any",
+    "args": [
+      {
+        "name": "varName",
+        "type": "string",
+        "optional": false
+      },
+      {
+        "name": "index",
+        "type": "int",
+        "optional": true,
+        "default": 0
+      }
+    ],
+    "examples": [
+      "?summon.GetId() = cinderwisp &\n^summon.GetVar(\"ignition\") > 2\n  activate cinderwisp"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "summon.GetState",
+    "type": "func",
+    "group": "summon",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "index",
+        "type": "int",
+        "optional": true,
+        "default": 0
+      }
+    ],
+    "examples": [
+      ">`0,1,Summon state:@summon.GetState()@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "summon.GetTime",
+    "type": "func",
+    "group": "summon",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "index",
+        "type": "int",
+        "optional": true,
+        "default": 0
+      }
+    ],
+    "examples": [
+      ">`0,1,Summon time:@summon.GetTime()@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "time",
+    "type": "var",
+    "group": "time",
+    "return_type": "number",
+    "examples": [
+      "?time % 300 = 0\n  >Every 10 seconds you'll see this message"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "totaltime",
+    "type": "var",
+    "group": "time",
+    "return_type": "number",
+    "examples": [
+      ">`0,0,Current time = @totaltime@ frames"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "time.msbn",
+    "type": "var",
+    "group": "time",
+    "return_type": "BigNumber",
+    "examples": [
+      ">@time.msbn@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "time.year",
+    "type": "var",
+    "group": "time",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "time.month",
+    "type": "var",
+    "group": "time",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "time.day",
+    "type": "var",
+    "group": "time",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "time.hour",
+    "type": "var",
+    "group": "time",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "time.minute",
+    "type": "var",
+    "group": "time",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "time.second",
+    "type": "var",
+    "group": "time",
+    "return_type": "number",
+    "examples": [
+      ">`0,0,@time.year@/@time.month@/@time.day@\n^ @time.hour@:@time.minute@:@time.second@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "utc.year",
+    "type": "var",
+    "group": "time",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "utc.month",
+    "type": "var",
+    "group": "time",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "utc.day",
+    "type": "var",
+    "group": "time",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "utc.hour",
+    "type": "var",
+    "group": "time",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "utc.minute",
+    "type": "var",
+    "group": "time",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "utc.second",
+    "type": "var",
+    "group": "time",
+    "return_type": "number",
+    "sealed_group": true
+  },
+  {
+    "id": "time.FormatCasual",
+    "type": "func",
+    "group": "time",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "frames",
+        "type": "int",
+        "optional": false
+      },
+      {
+        "name": "precise",
+        "type": "bool",
+        "optional": true
+      }
+    ],
+    "examples": [
+      ">`0,0,Current time =\n^ @time.FormatCasual(totaltime, true)@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "time.FormatDigital",
+    "type": "func",
+    "group": "time",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "frames",
+        "type": "int",
+        "optional": false
+      },
+      {
+        "name": "precise",
+        "type": "bool",
+        "optional": true
+      }
+    ],
+    "examples": [
+      ">`0,0,Current time =\n^ @time.FormatDigital(totaltime, true)@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "ambient",
+    "type": "var",
+    "group": "ambient",
+    "return_type": "string",
+    "examples": [
+      ">`0,0,Ambient Layers = @ambient@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "ambient.Add",
+    "type": "func",
+    "group": "ambient",
+    "return_type": "void",
+    "args": [
+      {
+        "name": "soundId",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "?loc.begin\n  ambient.Add(ambient_crypt)"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "ambient.Stop",
+    "type": "func",
+    "group": "ambient",
+    "return_type": "void",
+    "examples": [
+      "?time = 3\n  ambient.Stop()\n  ambient.Add(ambient_mines)"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.BigNumber",
+    "type": "func",
+    "group": "BigNumber",
+    "return_type": "BigNumber",
+    "args": [
+      {
+        "name": "value",
+        "type": "number|string",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "var myBigNum = math.BigNumber(\"500\")\nmyBigNum.Add(500).Mul(1000)\n>@myBigNum@"
+    ]
+  },
+  {
+    "id": "b.Add",
+    "type": "func",
+    "group": "BigNumber",
+    "return_type": "BigNumber",
+    "args": [
+      {
+        "name": "value",
+        "type": "number|BigNumber",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "var bn = math.BigNumber(12)\nbn.Add(5)\n>@bn@\n// 17"
+    ]
+  },
+  {
+    "id": "b.Sub",
+    "type": "func",
+    "group": "BigNumber",
+    "return_type": "BigNumber",
+    "args": [
+      {
+        "name": "value",
+        "type": "number|BigNumber",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "var bn = math.BigNumber(12)\nbn.Sub(5)\n>@bn@\n// 7"
+    ]
+  },
+  {
+    "id": "b.Mul",
+    "type": "func",
+    "group": "BigNumber",
+    "return_type": "BigNumber",
+    "args": [
+      {
+        "name": "value",
+        "type": "number|BigNumber",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "var myBigNum1 = math.BigNumber(12)\nmyBigNum1.Mul(5)\n>@myBigNum1@\n// 60"
+    ]
+  },
+  {
+    "id": "b.Div",
+    "type": "func",
+    "group": "BigNumber",
+    "return_type": "BigNumber",
+    "args": [
+      {
+        "name": "value",
+        "type": "number|BigNumber",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "var myBigNum1 = math.BigNumber(12)\nmyBigNum1.Div(5)\n>@myBigNum1@\n// 2"
+    ]
+  },
+  {
+    "id": "b.Eq",
+    "type": "func",
+    "group": "BigNumber",
+    "return_type": "bool",
+    "args": [
+      {
+        "name": "value",
+        "type": "number|BigNumber",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "var bn = math.BigNumber(5)\n>@bn.Eq(5)@ @bn.Eq(3)@\n// true false"
+    ]
+  },
+  {
+    "id": "b.Gt",
+    "type": "func",
+    "group": "BigNumber",
+    "return_type": "bool",
+    "args": [
+      {
+        "name": "value",
+        "type": "number|BigNumber",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "var bn = math.BigNumber(5)\n>@bn.Gt(3)@ @bn.Gt(10)@\n// true false"
+    ]
+  },
+  {
+    "id": "b.Ge",
+    "type": "func",
+    "group": "BigNumber",
+    "return_type": "bool",
+    "args": [
+      {
+        "name": "value",
+        "type": "number|BigNumber",
+        "optional": false
+      }
+    ]
+  },
+  {
+    "id": "b.Lt",
+    "type": "func",
+    "group": "BigNumber",
+    "return_type": "bool",
+    "args": [
+      {
+        "name": "value",
+        "type": "number|BigNumber",
+        "optional": false
+      }
+    ]
+  },
+  {
+    "id": "b.Le",
+    "type": "func",
+    "group": "BigNumber",
+    "return_type": "bool",
+    "args": [
+      {
+        "name": "value",
+        "type": "number|BigNumber",
+        "optional": false
+      }
+    ]
+  },
+  {
+    "id": "b.ToFloat",
+    "type": "func",
+    "group": "BigNumber",
+    "return_type": "float",
+    "examples": [
+      "var bn = math.BigNumber(5)\nvar fNumber = bn.ToFloat()\n>float = @fNumber@"
+    ]
+  },
+  {
+    "id": "b.ToInt",
+    "type": "func",
+    "group": "BigNumber",
+    "return_type": "int",
+    "examples": [
+      "var bn = math.BigNumber(5)\nvar iNumber = bn.ToInt()\n>integer = @iNumber@"
+    ]
+  },
+  {
+    "id": "b.ToString",
+    "type": "func",
+    "group": "BigNumber",
+    "return_type": "string",
+    "examples": [
+      "var myBigNum = math.BigNumber(\"123456789123456789\")\nstorage.Set(\"myBN\", myBigNum.ToString())\n---\nvar bnStr = storage.Get(\"myBN\")\nvar myBigNum = math.BigNumber(bnStr)"
+    ]
+  },
+  {
+    "id": "b.ToUI",
+    "type": "func",
+    "group": "BigNumber",
+    "return_type": "string",
+    "examples": [
+      "var myBigNum = math.BigNumber(\"123456789123456789\")\n>@myBigNum.ToUI()@\n// 123.5Qa"
+    ]
+  },
+  {
+    "id": "color.FromRGB",
+    "type": "func",
+    "group": "color",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "r",
+        "type": "int",
+        "optional": false
+      },
+      {
+        "name": "g",
+        "type": "int",
+        "optional": false
+      },
+      {
+        "name": "b",
+        "type": "int",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "var c = color.FromRGB(255, 0, 128)\n>`0,0,@c@, @c@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "color.ToRGB",
+    "type": "func",
+    "group": "color",
+    "return_type": "int[3]",
+    "args": [
+      {
+        "name": "color",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "var c = color.Random()\nvar rgb = color.ToRGB(c)\nvar r = rgb[0]"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "color.Lerp",
+    "type": "func",
+    "group": "color",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "c1",
+        "type": "string",
+        "optional": false
+      },
+      {
+        "name": "c2",
+        "type": "string",
+        "optional": false
+      },
+      {
+        "name": "t",
+        "type": "float",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "c = color.Lerp(\"#ff4400\", \"#8888ff\", 0.5)"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "color.Random",
+    "type": "func",
+    "group": "color",
+    "return_type": "string",
+    "examples": [
+      "var c = color.Random()\n>`0,0,@c@,@c@\\n ██████"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "draw.Bg",
+    "type": "func",
+    "group": "draw",
+    "return_type": "void",
+    "overloads": [
+      {
+        "args": [
+          {
+            "name": "x",
+            "type": "int",
+            "optional": false
+          },
+          {
+            "name": "y",
+            "type": "int",
+            "optional": false
+          },
+          {
+            "name": "color",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "args": [
+          {
+            "name": "x",
+            "type": "int",
+            "optional": false
+          },
+          {
+            "name": "y",
+            "type": "int",
+            "optional": false
+          },
+          {
+            "name": "color",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "w",
+            "type": "int",
+            "optional": false
+          },
+          {
+            "name": "h",
+            "type": "int",
+            "optional": false
+          }
+        ]
+      }
+    ],
+    "examples": [
+      "draw.Bg(5, 4, #red)",
+      "draw.Bg(5, 4, #cyan, 10, 6)"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "draw.Box",
+    "type": "func",
+    "group": "draw",
+    "return_type": "void",
+    "args": [
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false
+      },
+      {
+        "name": "w",
+        "type": "int",
+        "optional": false
+      },
+      {
+        "name": "h",
+        "type": "int",
+        "optional": false
+      },
+      {
+        "name": "color",
+        "type": "string",
+        "optional": false
+      },
+      {
+        "name": "style",
+        "type": "int",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "draw.Box(10, 5, 30, 15, #333333, style)"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "draw.Clear",
+    "type": "func",
+    "group": "draw",
+    "return_type": "void",
+    "sealed_group": true
+  },
+  {
+    "id": "draw.GetSymbol",
+    "type": "func",
+    "group": "draw",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "s = draw.GetSymbol(x, y)\n>`0,1,Symbol = @s@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "draw.Player",
+    "type": "func",
+    "group": "draw",
+    "return_type": "void",
+    "args": [
+      {
+        "name": "x",
+        "type": "int",
+        "optional": true
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": true
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "event.GetObjectiveId",
+    "type": "func",
+    "group": "event",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "index",
+        "type": "int",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "id = event.GetObjectiveId(0)\np = event.GetObjectiveProgress(0)\ng = event.GetObjectiveGoal(0)\n>`0,1,@id@:@p@/@g@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "event.GetObjectiveProgress",
+    "type": "func",
+    "group": "event",
+    "return_type": "int",
+    "args": [
+      {
+        "name": "index",
+        "type": "int",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "event.GetObjectiveGoal",
+    "type": "func",
+    "group": "event",
+    "return_type": "int",
+    "args": [
+      {
+        "name": "index",
+        "type": "int",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "int.Parse",
+    "type": "func",
+    "group": "int",
+    "return_type": "int",
+    "args": [
+      {
+        "name": "str",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "var s = \"999\"\nvar i = int.Parse(s)\ni++"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "item.CanActivate",
+    "type": "func",
+    "group": "item",
+    "return_type": "bool",
+    "overloads": [
+      {
+        "args": []
+      },
+      {
+        "args": [
+          {
+            "name": "itemId",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      }
+    ],
+    "examples": [
+      "?item.CanActivate()\n  equip Bardiche\n  activate R"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "item.GetCooldown",
+    "type": "func",
+    "group": "item",
+    "return_type": "int",
+    "args": [
+      {
+        "name": "abilityId",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "?foe = boss & item.GetCooldown(\"bardiche\") = 0\n  activate R"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "item.GetCount",
+    "type": "func",
+    "group": "item",
+    "return_type": "int",
+    "args": [
+      {
+        "name": "searchString",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "var swordCount = item.GetCount(\"sword *0 -big\")\n>I have @swordCount@ basic swords"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "item.GetLoadoutL",
+    "type": "func",
+    "group": "item",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "loadoutN",
+        "type": "int",
+        "optional": false
+      }
+    ],
+    "examples": [
+      ">`0,1,Left: @item.GetLoadoutL(1)@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "item.GetLoadoutR",
+    "type": "func",
+    "group": "item",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "loadoutN",
+        "type": "int",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "item.GetTreasureCount",
+    "type": "func",
+    "group": "item",
+    "return_type": "int",
+    "sealed_group": true
+  },
+  {
+    "id": "item.GetTreasureLimit",
+    "type": "func",
+    "group": "item",
+    "return_type": "int",
+    "examples": [
+      "trs = item.GetTreasureCount()\nmax = item.GetTreasureLimit()\n>`0,2,Treasures: @trs@/@max@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "key.Bind",
+    "type": "func",
+    "group": "key",
+    "return_type": "void",
+    "args": [
+      {
+        "name": "action",
+        "type": "string",
+        "optional": false
+      },
+      {
+        "name": "key1",
+        "type": "string",
+        "optional": false
+      },
+      {
+        "name": "key2",
+        "type": "string",
+        "optional": true
+      }
+    ],
+    "examples": [
+      "?loc.begin\n  key.Bind(\"Potion\", \"P\")"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "key.GetKeyAct",
+    "type": "func",
+    "group": "key",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "key",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "key.GetActKey",
+    "type": "func",
+    "group": "key",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "action",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "key.GetActKey2",
+    "type": "func",
+    "group": "key",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "action",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "key.GetActLabel",
+    "type": "func",
+    "group": "key",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "action",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "key.ResetBinds",
+    "type": "func",
+    "group": "key",
+    "return_type": "void",
+    "sealed_group": true
+  },
+  {
+    "id": "loc.Leave",
+    "type": "func",
+    "group": "loc",
+    "return_type": "void",
+    "sealed_group": true
+  },
+  {
+    "id": "loc.Pause",
+    "type": "func",
+    "group": "loc",
+    "return_type": "void",
+    "sealed_group": true
+  },
+  {
+    "id": "math.Abs",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "num",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "var number = -2\nnumber = math.Abs(number)\n// number now equals 2"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.Acos",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "num",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.Asin",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "num",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.Atan",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "num",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.Atan2",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "y",
+        "type": "number",
+        "optional": false
+      },
+      {
+        "name": "x",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.Ceil",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "num",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.CeilToInt",
+    "type": "func",
+    "group": "math",
+    "return_type": "int",
+    "args": [
+      {
+        "name": "num",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.Clamp",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "num",
+        "type": "number",
+        "optional": false
+      },
+      {
+        "name": "min",
+        "type": "number",
+        "optional": false
+      },
+      {
+        "name": "max",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "number = math.Clamp(number, 0, 10)"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.Cos",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "num",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.e",
+    "type": "var",
+    "group": "math",
+    "return_type": "float",
+    "examples": [
+      ">E = @math.e@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.Exp",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "num",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.Floor",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "num",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.FloorToInt",
+    "type": "func",
+    "group": "math",
+    "return_type": "int",
+    "args": [
+      {
+        "name": "num",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.Lerp",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "a",
+        "type": "number",
+        "optional": false
+      },
+      {
+        "name": "b",
+        "type": "number",
+        "optional": false
+      },
+      {
+        "name": "t",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "var number = math.Lerp(0.0, 20.0, 0.75)\n// number equals 15.0"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.Log",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "num",
+        "type": "number",
+        "optional": false
+      },
+      {
+        "name": "base",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.Max",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "num1",
+        "type": "number",
+        "optional": false
+      },
+      {
+        "name": "num2",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.Min",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "num1",
+        "type": "number",
+        "optional": false
+      },
+      {
+        "name": "num2",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.pi",
+    "type": "var",
+    "group": "math",
+    "return_type": "float",
+    "examples": [
+      ">PI = @math.pi@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.Pow",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "num",
+        "type": "number",
+        "optional": false
+      },
+      {
+        "name": "p",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.Round",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "num",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.RoundToInt",
+    "type": "func",
+    "group": "math",
+    "return_type": "int",
+    "args": [
+      {
+        "name": "num",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.Sign",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "num",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "var sign = math.Sign(-21)\nvar n = 10 * sign\n// n equals -10"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.Sin",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "num",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.Sqrt",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "num",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.Tan",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "num",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.ToDeg",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "radians",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "var number = math.ToDeg(2 * math.pi)\n// number equals 360"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "math.ToRad",
+    "type": "func",
+    "group": "math",
+    "return_type": "number",
+    "args": [
+      {
+        "name": "degrees",
+        "type": "number",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "var number = math.ToRad(360)\n// number equals 2π"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "music",
+    "type": "var",
+    "group": "music",
+    "return_type": "string",
+    "examples": [
+      ">`0,0,Current Music = @music@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "music.Play",
+    "type": "func",
+    "group": "music",
+    "return_type": "void",
+    "args": [
+      {
+        "name": "trackId",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "?loc.begin | loc.loop\n  music.Play(temple_0)"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "music.Stop",
+    "type": "func",
+    "group": "music",
+    "return_type": "void",
+    "examples": [
+      "?!string.Equals(music, \"\")\n  music.Stop()"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "screen.FromWorldX",
+    "type": "func",
+    "group": "screen",
+    "return_type": "int",
+    "args": [
+      {
+        "name": "worldX",
+        "type": "int",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "x = screen.FromWorldX(pos.x)"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "screen.FromWorldZ",
+    "type": "func",
+    "group": "screen",
+    "return_type": "int",
+    "args": [
+      {
+        "name": "worldZ",
+        "type": "int",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "screen.ToWorldX",
+    "type": "func",
+    "group": "screen",
+    "return_type": "int",
+    "args": [
+      {
+        "name": "screenX",
+        "type": "int",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "x = screen.ToWorldX(input.x)"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "screen.ToWorldZ",
+    "type": "func",
+    "group": "screen",
+    "return_type": "int",
+    "args": [
+      {
+        "name": "screenY",
+        "type": "int",
+        "optional": false
+      }
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "screen.Next",
+    "type": "func",
+    "group": "screen",
+    "return_type": "void",
+    "examples": [
+      "?key = rightBegin\n  screen.Next()"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "screen.Previous",
+    "type": "func",
+    "group": "screen",
+    "return_type": "void",
+    "examples": [
+      "?key = leftBegin\n  screen.Previous()"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "screen.ResetOffset",
+    "type": "func",
+    "group": "screen",
+    "return_type": "void",
+    "sealed_group": true
+  },
+  {
+    "id": "storage.Delete",
+    "type": "func",
+    "group": "storage",
+    "return_type": "void",
+    "args": [
+      {
+        "name": "key",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "storage.Delete(\"highscore\")"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "storage.Get",
+    "type": "func",
+    "group": "storage",
+    "return_type": "any",
+    "overloads": [
+      {
+        "args": [
+          {
+            "name": "key",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "args": [
+          {
+            "name": "key",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "default",
+            "type": "any",
+            "optional": false
+          }
+        ]
+      }
+    ],
+    "examples": [
+      "var value = storage.Get(\"highscore\")\n?value\n  >High Score = @value@",
+      "var value = storage.Get(\"highscore\", 0)\n>High Score = @value@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "storage.Has",
+    "type": "func",
+    "group": "storage",
+    "return_type": "bool",
+    "args": [
+      {
+        "name": "key",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "?storage.Has(\"highscore\")\n  var value = storage.Get(\"highscore\")"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "storage.Incr",
+    "type": "func",
+    "group": "storage",
+    "return_type": "int",
+    "overloads": [
+      {
+        "args": [
+          {
+            "name": "key",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "args": [
+          {
+            "name": "key",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "amount",
+            "type": "int",
+            "optional": false
+          }
+        ]
+      }
+    ],
+    "examples": [
+      "?gameOver\n  storage.Incr(\"stat_TimesPlayed\")"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "storage.Keys",
+    "type": "func",
+    "group": "storage",
+    "return_type": "array",
+    "examples": [
+      "var a = storage.Keys()\nfor i = 0 .. a.Count()-1\n  >Key @i@ = @a[i]@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "storage.Set",
+    "type": "func",
+    "group": "storage",
+    "return_type": "void",
+    "args": [
+      {
+        "name": "key",
+        "type": "string",
+        "optional": false
+      },
+      {
+        "name": "value",
+        "type": "any",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "storage.Set(\"highscore\", score)"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "string.Break",
+    "type": "func",
+    "group": "string",
+    "return_type": "array",
+    "args": [
+      {
+        "name": "str",
+        "type": "string",
+        "optional": false
+      },
+      {
+        "name": "maxWidth",
+        "type": "int",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "var a = string.Break(s, 14)"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "string.Capitalize",
+    "type": "func",
+    "group": "string",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "str",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "a = string.Capitalize(a)\n>@a@\n// Prints \"Foo\""
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "string.Equals",
+    "type": "func",
+    "group": "string",
+    "return_type": "bool",
+    "args": [
+      {
+        "name": "str1",
+        "type": "string",
+        "optional": false
+      },
+      {
+        "name": "str2",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "?string.Equals(a, \"foo\")\n  >The strings are equal"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "string.Format",
+    "type": "func",
+    "group": "string",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "template",
+        "type": "string",
+        "optional": false
+      },
+      {
+        "name": "...values",
+        "type": "any",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "var result = string.Format(\n^  \"My name is {0} and I have {1} power!\",\n^  player.name,\n^  totalgp\n^)\n>@result@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "string.IndexOf",
+    "type": "func",
+    "group": "string",
+    "return_type": "int",
+    "overloads": [
+      {
+        "args": [
+          {
+            "name": "str",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "criteria",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "args": [
+          {
+            "name": "str",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "criteria",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "startAt",
+            "type": "int",
+            "optional": false
+          }
+        ]
+      }
+    ],
+    "examples": [
+      "var index = string.IndexOf(a, \"llo\")\n// index equals 2"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "string.Join",
+    "type": "func",
+    "group": "string",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "separator",
+        "type": "string",
+        "optional": false
+      },
+      {
+        "name": "array",
+        "type": "array",
+        "optional": false
+      },
+      {
+        "name": "startAt",
+        "type": "int",
+        "optional": true
+      },
+      {
+        "name": "count",
+        "type": "int",
+        "optional": true
+      }
+    ],
+    "examples": [
+      "var b = string.Join(\";\", a)\n>`0,0,@b@\n// Prints \"Hello;World;!\""
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "string.Size",
+    "type": "func",
+    "group": "string",
+    "return_type": "int",
+    "args": [
+      {
+        "name": "str",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "var size = string.Size(a)"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "string.Split",
+    "type": "func",
+    "group": "string",
+    "return_type": "array",
+    "args": [
+      {
+        "name": "str",
+        "type": "string",
+        "optional": false
+      },
+      {
+        "name": "separators",
+        "type": "string",
+        "optional": true
+      },
+      {
+        "name": "keepEmpty",
+        "type": "bool",
+        "optional": true
+      }
+    ],
+    "examples": [
+      "var a = string.Split(\"Hello World !\")"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "string.Sub",
+    "type": "func",
+    "group": "string",
+    "return_type": "string",
+    "overloads": [
+      {
+        "args": [
+          {
+            "name": "str",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "startAt",
+            "type": "int",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "args": [
+          {
+            "name": "str",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "startAt",
+            "type": "int",
+            "optional": false
+          },
+          {
+            "name": "length",
+            "type": "int",
+            "optional": false
+          }
+        ]
+      }
+    ],
+    "examples": [
+      "var subString = string.Sub(a, 6)\n// subString equals \"World!\""
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "string.ToLower",
+    "type": "func",
+    "group": "string",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "str",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "a = string.ToLower(a)\n>@a@\n// Prints \"foo\""
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "string.ToUpper",
+    "type": "func",
+    "group": "string",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "str",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "a = string.ToUpper(a)\n>@a@\n// Prints \"FOO\""
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "sys.cacheRemoteFiles",
+    "type": "var",
+    "group": "sys",
+    "return_type": "bool",
+    "examples": [
+      "sys.cacheRemoteFiles = !sys.cacheRemoteFiles"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "sys.fileUrl",
+    "type": "var",
+    "group": "sys",
+    "return_type": "string",
+    "examples": [
+      ">`0,1,fileUrl = @sys.fileUrl@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "sys.isMobile",
+    "type": "var",
+    "group": "sys",
+    "return_type": "bool",
+    "sealed_group": true
+  },
+  {
+    "id": "sys.isPC",
+    "type": "var",
+    "group": "sys",
+    "return_type": "bool",
+    "sealed_group": true
+  },
+  {
+    "id": "sys.os",
+    "type": "var",
+    "group": "sys",
+    "return_type": "string",
+    "sealed_group": true
+  },
+  {
+    "id": "sys.SetFileUrl",
+    "type": "func",
+    "group": "sys",
+    "return_type": "void",
+    "args": [
+      {
+        "name": "url",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "sys.SetFileUrl(\"https://MyCoolDomain.com/scripts/\")\nimport MyCombatScript"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "sys.MindConnect",
+    "type": "func",
+    "group": "sys",
+    "return_type": "void",
+    "sealed_group": true
+  },
+  {
+    "id": "te.language",
+    "type": "var",
+    "group": "te",
+    "return_type": "string",
+    "examples": [
+      "var lang = te.language\n>Language = @lang@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "te.xt",
+    "type": "func",
+    "group": "te",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "text",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "button.text = te.xt(Play)"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "te.GetTID",
+    "type": "func",
+    "group": "te",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "text",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "var tid = te.GetTID(\"Play\")\n>`0,1,@tid@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "te.ToEnglish",
+    "type": "func",
+    "group": "te",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "text",
+        "type": "string",
+        "optional": false
+      }
+    ],
+    "examples": [
+      ">`0,1,@te.ToEnglish(\"Jogar\")@"
+    ],
+    "sealed_group": true
+  },
+  {
+    "id": "Type",
+    "type": "func",
+    "group": "misc",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "var",
+        "type": "any",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "var a = 0\n?Type(a) = int\n  >Variable 'a' is an integer."
+    ]
+  },
+  {
+    "id": "ui.root",
+    "type": "var",
+    "group": "ui",
+    "return_type": "Panel",
+    "examples": [
+      "disable hud\nui.root.visible = true"
+    ]
+  },
+  {
+    "id": "ui.AddAnim",
+    "type": "func",
+    "group": "ui",
+    "return_type": "Anim",
+    "args": [
+      {
+        "name": "spriteSheet",
+        "type": "string",
+        "optional": false
+      }
+    ]
+  },
+  {
+    "id": "ui.AddButton",
+    "type": "func",
+    "group": "ui",
+    "return_type": "Button"
+  },
+  {
+    "id": "ui.AddCanvas",
+    "type": "func",
+    "group": "ui",
+    "return_type": "Canvas"
+  },
+  {
+    "id": "ui.AddPanel",
+    "type": "func",
+    "group": "ui",
+    "return_type": "Panel"
+  },
+  {
+    "id": "ui.AddStyle",
+    "type": "func",
+    "group": "ui",
+    "return_type": "int",
+    "args": [
+      {
+        "name": "styleString",
+        "type": "string",
+        "optional": false
+      }
+    ]
+  },
+  {
+    "id": "ui.AddText",
+    "type": "func",
+    "group": "ui",
+    "return_type": "Text",
+    "args": [
+      {
+        "name": "text",
+        "type": "string",
+        "optional": true
+      }
+    ]
+  },
+  {
+    "id": "ui.Clear",
+    "type": "func",
+    "group": "ui",
+    "return_type": "void"
+  },
+  {
+    "id": "ui.OpenInv",
+    "type": "func",
+    "group": "ui",
+    "return_type": "void"
+  },
+  {
+    "id": "ui.OpenMind",
+    "type": "func",
+    "group": "ui",
+    "return_type": "void"
+  },
+  {
+    "id": "ui.ShowBanner",
+    "type": "func",
+    "group": "ui",
+    "return_type": "void",
+    "args": [
+      {
+        "name": "line1",
+        "type": "string",
+        "optional": false
+      },
+      {
+        "name": "line2",
+        "type": "string",
+        "optional": true
+      }
+    ],
+    "examples": [
+      "?time = 120\n  ui.ShowBanner(\"Hello World!\")"
+    ]
+  },
+  {
+    "id": "component.x",
+    "type": "var",
+    "group": "Component",
+    "return_type": "int"
+  },
+  {
+    "id": "component.y",
+    "type": "var",
+    "group": "Component",
+    "return_type": "int"
+  },
+  {
+    "id": "component.w",
+    "type": "var",
+    "group": "Component",
+    "return_type": "int",
+    "examples": [
+      "button.w = string.Size(button.text) + 4"
+    ]
+  },
+  {
+    "id": "component.h",
+    "type": "var",
+    "group": "Component",
+    "return_type": "int"
+  },
+  {
+    "id": "component.absoluteX",
+    "type": "var",
+    "group": "Component",
+    "return_type": "int"
+  },
+  {
+    "id": "component.absoluteY",
+    "type": "var",
+    "group": "Component",
+    "return_type": "int"
+  },
+  {
+    "id": "component.anchor",
+    "type": "var",
+    "group": "Component",
+    "return_type": "string"
+  },
+  {
+    "id": "component.dock",
+    "type": "var",
+    "group": "Component",
+    "return_type": "string"
+  },
+  {
+    "id": "component.ax",
+    "type": "var",
+    "group": "Component",
+    "return_type": "string"
+  },
+  {
+    "id": "component.ay",
+    "type": "var",
+    "group": "Component",
+    "return_type": "string"
+  },
+  {
+    "id": "component.dx",
+    "type": "var",
+    "group": "Component",
+    "return_type": "string"
+  },
+  {
+    "id": "component.dy",
+    "type": "var",
+    "group": "Component",
+    "return_type": "string"
+  },
+  {
+    "id": "component.parent",
+    "type": "var",
+    "group": "Component",
+    "return_type": "Panel"
+  },
+  {
+    "id": "component.visible",
+    "type": "var",
+    "group": "Component",
+    "return_type": "bool|string"
+  },
+  {
+    "id": "component.Recycle",
+    "type": "func",
+    "group": "Component",
+    "return_type": "void"
+  },
+  {
+    "id": "panel.children",
+    "type": "var",
+    "group": "Panel",
+    "return_type": "Component[]"
+  },
+  {
+    "id": "panel.clip",
+    "type": "var",
+    "group": "Panel",
+    "return_type": "bool",
+    "examples": [
+      "p.clip = true"
+    ]
+  },
+  {
+    "id": "panel.color",
+    "type": "var",
+    "group": "Panel",
+    "return_type": "string"
+  },
+  {
+    "id": "panel.style",
+    "type": "var",
+    "group": "Panel",
+    "return_type": "int"
+  },
+  {
+    "id": "panel.Add",
+    "type": "func",
+    "group": "Panel",
+    "return_type": "void",
+    "args": [
+      {
+        "name": "component",
+        "type": "Component",
+        "optional": false
+      },
+      {
+        "name": "sortIndex",
+        "type": "int",
+        "optional": true
+      }
+    ]
+  },
+  {
+    "id": "panel.Clear",
+    "type": "func",
+    "group": "Panel",
+    "return_type": "void"
+  },
+  {
+    "id": "panel.Remove",
+    "type": "func",
+    "group": "Panel",
+    "return_type": "void",
+    "args": [
+      {
+        "name": "componentOrIndex",
+        "type": "Component|int",
+        "optional": false
+      }
+    ]
+  },
+  {
+    "id": "text.align",
+    "type": "var",
+    "group": "Text",
+    "return_type": "string"
+  },
+  {
+    "id": "text.color",
+    "type": "var",
+    "group": "Text",
+    "return_type": "string"
+  },
+  {
+    "id": "text.lines",
+    "type": "var",
+    "group": "Text",
+    "return_type": "string[]"
+  },
+  {
+    "id": "text.text",
+    "type": "var",
+    "group": "Text",
+    "return_type": "string",
+    "examples": [
+      "t.text = \"Hello [color=#red]World[/color]!\""
+    ]
+  },
+  {
+    "id": "button.text",
+    "type": "var",
+    "group": "Button",
+    "return_type": "string"
+  },
+  {
+    "id": "button.tcolor",
+    "type": "var",
+    "group": "Button",
+    "return_type": "string"
+  },
+  {
+    "id": "button.bcolor",
+    "type": "var",
+    "group": "Button",
+    "return_type": "string"
+  },
+  {
+    "id": "button.hcolor",
+    "type": "var",
+    "group": "Button",
+    "return_type": "string"
+  },
+  {
+    "id": "button.sound",
+    "type": "var",
+    "group": "Button",
+    "return_type": "string"
+  },
+  {
+    "id": "button.style",
+    "type": "var",
+    "group": "Button",
+    "return_type": "int"
+  },
+  {
+    "id": "button.SetPressed",
+    "type": "func",
+    "group": "Button",
+    "return_type": "void",
+    "args": [
+      {
+        "name": "callback",
+        "type": "func",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "button1.SetPressed(OnPressed)"
+    ]
+  },
+  {
+    "id": "button.SetDown",
+    "type": "func",
+    "group": "Button",
+    "return_type": "void",
+    "args": [
+      {
+        "name": "callback",
+        "type": "func",
+        "optional": false
+      }
+    ]
+  },
+  {
+    "id": "button.SetUp",
+    "type": "func",
+    "group": "Button",
+    "return_type": "void",
+    "args": [
+      {
+        "name": "callback",
+        "type": "func",
+        "optional": false
+      }
+    ]
+  },
+  {
+    "id": "anim.color",
+    "type": "var",
+    "group": "Anim",
+    "return_type": "string"
+  },
+  {
+    "id": "anim.duration",
+    "type": "var",
+    "group": "Anim",
+    "return_type": "int"
+  },
+  {
+    "id": "anim.flipX",
+    "type": "var",
+    "group": "Anim",
+    "return_type": "bool"
+  },
+  {
+    "id": "anim.flipY",
+    "type": "var",
+    "group": "Anim",
+    "return_type": "bool"
+  },
+  {
+    "id": "anim.frame",
+    "type": "var",
+    "group": "Anim",
+    "return_type": "int"
+  },
+  {
+    "id": "anim.gamePause",
+    "type": "var",
+    "group": "Anim",
+    "return_type": "bool"
+  },
+  {
+    "id": "anim.loop",
+    "type": "var",
+    "group": "Anim",
+    "return_type": "bool"
+  },
+  {
+    "id": "anim.playing",
+    "type": "var",
+    "group": "Anim",
+    "return_type": "bool"
+  },
+  {
+    "id": "anim.paused",
+    "type": "var",
+    "group": "Anim",
+    "return_type": "bool"
+  },
+  {
+    "id": "anim.pivotX",
+    "type": "var",
+    "group": "Anim",
+    "return_type": "int"
+  },
+  {
+    "id": "anim.pivotY",
+    "type": "var",
+    "group": "Anim",
+    "return_type": "int"
+  },
+  {
+    "id": "anim.playOnStart",
+    "type": "var",
+    "group": "Anim",
+    "return_type": "bool"
+  },
+  {
+    "id": "anim.AddLayer",
+    "type": "func",
+    "group": "Anim",
+    "return_type": "Anim",
+    "args": [
+      {
+        "name": "spriteSheet",
+        "type": "string",
+        "optional": false
+      }
+    ]
+  },
+  {
+    "id": "anim.Load",
+    "type": "func",
+    "group": "Anim",
+    "return_type": "void",
+    "args": [
+      {
+        "name": "spriteSheet",
+        "type": "string",
+        "optional": false
+      }
+    ]
+  },
+  {
+    "id": "anim.Pause",
+    "type": "func",
+    "group": "Anim",
+    "return_type": "void"
+  },
+  {
+    "id": "anim.Play",
+    "type": "func",
+    "group": "Anim",
+    "return_type": "void",
+    "examples": [
+      "dance.duration = 20\ndance.loop = true\ndance.Play()"
+    ]
+  },
+  {
+    "id": "anim.Stop",
+    "type": "func",
+    "group": "Anim",
+    "return_type": "void"
+  },
+  {
+    "id": "canvas.blend",
+    "type": "var",
+    "group": "Canvas",
+    "return_type": "string",
+    "examples": [
+      "filter1.blend = multiply"
+    ]
+  },
+  {
+    "id": "canvas.Get",
+    "type": "func",
+    "group": "Canvas",
+    "return_type": "string",
+    "args": [
+      {
+        "name": "x",
+        "type": "int",
+        "optional": false
+      },
+      {
+        "name": "y",
+        "type": "int",
+        "optional": false
+      }
+    ]
+  },
+  {
+    "id": "canvas.Set",
+    "type": "func",
+    "group": "Canvas",
+    "return_type": "void",
+    "overloads": [
+      {
+        "args": [
+          {
+            "name": "glyph",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "args": [
+          {
+            "name": "x",
+            "type": "int",
+            "optional": false
+          },
+          {
+            "name": "y",
+            "type": "int",
+            "optional": false
+          },
+          {
+            "name": "glyph",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "args": [
+          {
+            "name": "x",
+            "type": "int",
+            "optional": false
+          },
+          {
+            "name": "y",
+            "type": "int",
+            "optional": false
+          },
+          {
+            "name": "fg",
+            "type": "string",
+            "optional": false
+          },
+          {
+            "name": "bg",
+            "type": "string",
+            "optional": true
+          },
+          {
+            "name": "glyph",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      }
+    ],
+    "examples": [
+      "canvas.Set(\"X\")",
+      "canvas.Set(0, 0, \"A\")"
+    ]
+  },
+  {
+    "id": "canvas.SetFG",
+    "type": "func",
+    "group": "Canvas",
+    "return_type": "void",
+    "overloads": [
+      {
+        "args": [
+          {
+            "name": "color",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "args": [
+          {
+            "name": "x",
+            "type": "int",
+            "optional": false
+          },
+          {
+            "name": "y",
+            "type": "int",
+            "optional": false
+          },
+          {
+            "name": "color",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      }
+    ],
+    "examples": [
+      "canvas.SetFG(#red)",
+      "canvas.SetFG(2, 1, #ff00ff)"
+    ]
+  },
+  {
+    "id": "canvas.SetBG",
+    "type": "func",
+    "group": "Canvas",
+    "return_type": "void",
+    "overloads": [
+      {
+        "args": [
+          {
+            "name": "color",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      },
+      {
+        "args": [
+          {
+            "name": "x",
+            "type": "int",
+            "optional": false
+          },
+          {
+            "name": "y",
+            "type": "int",
+            "optional": false
+          },
+          {
+            "name": "color",
+            "type": "string",
+            "optional": false
+          }
+        ]
+      }
+    ],
+    "examples": [
+      "canvas.SetBG(#00aa00)",
+      "canvas.SetBG(2, 1, #yellow)"
+    ]
+  },
+  {
+    "id": "array.Count",
+    "type": "func",
+    "group": "array",
+    "return_type": "int",
+    "examples": [
+      "var count = myArray.Count()"
+    ]
+  },
+  {
+    "id": "array.Clear",
+    "type": "func",
+    "group": "array",
+    "return_type": "void",
+    "examples": [
+      "clearedEachFrame.Clear()"
+    ]
+  },
+  {
+    "id": "array[index]",
+    "type": "syntax",
+    "group": "array",
+    "syntax": "<array>[<index>]",
+    "examples": [
+      "var value = a[1][0]"
+    ]
+  },
+  {
+    "id": "search_filter",
+    "type": "enum",
+    "group": "search-filters",
+    "values": [
+      "poison",
+      "vigor",
+      "aether",
+      "fire",
+      "air",
+      "ice",
+      "arachnid",
+      "serpent",
+      "insect",
+      "machine",
+      "humanoid",
+      "elemental",
+      "boss",
+      "phase1",
+      "phase2",
+      "phase3",
+      "spawner",
+      "flying",
+      "slow",
+      "ranged",
+      "explode",
+      "swarm",
+      "unpushable",
+      "undamageable",
+      "magic_resist",
+      "magic_vulnerability",
+      "immune_to_stun",
+      "immune_to_ranged",
+      "immune_to_debuff_damage",
+      "immune_to_physical"
+    ],
+    "examples": [
+      "?foe = insect | foe = poison\n  loadout 3"
+    ]
+  },
+  {
+    "id": "key_code",
+    "type": "enum",
+    "group": "custom-input",
+    "values": [
+      "left",
+      "leftBegin",
+      "right",
+      "rightBegin",
+      "up",
+      "upBegin",
+      "down",
+      "downBegin",
+      "primary",
+      "primaryBegin",
+      "back",
+      "backBegin",
+      "ability1",
+      "ability1Begin",
+      "ability2",
+      "ability2Begin",
+      "bumpL",
+      "bumpLBegin",
+      "bumpR",
+      "bumpRBegin",
+      "begin"
+    ],
+    "examples": [
+      "?key = leftBegin\n  x--"
+    ]
+  },
+  {
+    "id": "__validation__",
+    "type": "meta",
+    "sealed_groups": [
+      "ambient",
+      "color",
+      "draw",
+      "encounter",
+      "event",
+      "foe",
+      "harvest",
+      "input",
+      "int",
+      "item",
+      "key",
+      "loc",
+      "math",
+      "music",
+      "pickup",
+      "player",
+      "res",
+      "rng",
+      "screen",
+      "storage",
+      "string",
+      "summon",
+      "sys",
+      "te",
+      "time"
+    ],
+    "reserved_var_names": [
+      "Type",
+      "ai",
+      "ambient",
+      "anim",
+      "armor",
+      "array",
+      "b",
+      "bighead",
+      "buffs",
+      "button",
+      "canvas",
+      "color",
+      "component",
+      "debuffs",
+      "draw",
+      "encounter",
+      "event",
+      "face",
+      "foe",
+      "harvest",
+      "hp",
+      "input",
+      "int",
+      "item",
+      "key",
+      "loc",
+      "math",
+      "maxarmor",
+      "maxhp",
+      "music",
+      "panel",
+      "pickup",
+      "player",
+      "pos",
+      "res",
+      "rng",
+      "rngf",
+      "screen",
+      "storage",
+      "string",
+      "summon",
+      "sys",
+      "te",
+      "text",
+      "time",
+      "totalgp",
+      "totaltime",
+      "ui",
+      "utc"
+    ],
+    "valid_statement_types": [
+      "command",
+      "keyword",
+      "func_def",
+      "for_loop",
+      "assign",
+      "call",
+      "comment",
+      "continuation",
+      "condition",
+      "elseif",
+      "else",
+      "print",
+      "empty"
+    ],
+    "invalid_as_statement": [
+      "var_read"
+    ],
+    "note": "Entries with type=meta are parser metadata, not language constructs",
+    "continuation_must_start_with": [
+      "&",
+      "|",
+      "(",
+      "."
+    ],
+    "continuation_note": "Una linea ^ debe empezar con & o | (conectores logicos) o con ( o . (continuacion de expresion/llamada).",
+    "keywords_not_allowed_in_expr": [
+      "ascii",
+      "break",
+      "continue",
+      "for",
+      "for :",
+      "func",
+      "import",
+      "new",
+      "return",
+      "var"
+    ],
+    "ability_id_source": "activate.arg_validation",
+    "non_assignable_roots": [
+      "ai",
+      "ambient",
+      "armor",
+      "bighead",
+      "buffs",
+      "debuffs",
+      "encounter",
+      "face",
+      "foe",
+      "harvest",
+      "hp",
+      "input",
+      "item",
+      "key",
+      "loc",
+      "math",
+      "maxarmor",
+      "maxhp",
+      "music",
+      "pickup",
+      "player",
+      "pos",
+      "res",
+      "rng",
+      "rngf",
+      "screen",
+      "summon",
+      "sys",
+      "te",
+      "time",
+      "totalgp",
+      "totaltime",
+      "utc"
+    ],
+    "non_assignable_note": "Variables nativas selladas: sus raices no pueden ser asignadas directamente. foe=\"x\", totaltime=5, hp=0 etc. son errores."
+  }
+]
