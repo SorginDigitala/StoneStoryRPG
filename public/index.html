@@ -107,51 +107,46 @@ try {
 document.getElementById('loading').style.display = 'none';
 ['header','body','wbar'].forEach(id => document.getElementById(id).style.display = '');
 
-const _DEFAULT = `import UI/MindstoneButton
-?loc.Id = "undead_crypt"
-  brew wood + bronze
-  ?summon.count =< 0 & item.CanActivate()
-   equipR fire talisman
-    activate R
-     equipR compound 
-  ?pickup.distance < 10
-    equipR star
-  ?foe.distance > 23
-    equipL tri
-    equipR com
-   ?foe.distance <= 23
-    equip metralhadora de vigoa
- 
-  ?foe.Id = "skeleton_boss"
-  ?foe.state = 32 &
-  ^foe.time = 60 &
-  ^item.GetCooldown("mind stone") > 0
-    equip mind stone
-    activate R
-  :?foe.state = 32 &
-  ^foe.time = 60 &
-  ^item.CanActivate()
-    equipL mind
-    equipR compound 
-  :?foe.count = 0 &
-  ^item.GetCooldown("staff_fire") <= 0
-    equipR gandalf
-    activate R
-  ?foe.distance > 23
-    equipL tri
-    equipR com *10
-  ?foe.distance <= 23 
-    equip metralhadora de vigor
-?foe.Id = "skeleton_boss_stage_2"
-  ?foe.state = 2 &
-  ^foe.time = 20
-    activate potion
-?
-equipR sword
+const _DEFAULT = `// Cuando se activa, la piedra sigue
+// continuamente las instrucciones que se le
+// indiquen.
+// Estas deben grabarse en petroscripto.
+// Más información en:
+// StoneStoryRPG.com/stonescript
+// (Bezerra, el Sabio)
 
-func x()
-?true
- >works`;
+import UI/MindstoneButton
+
+?loc=caves
+ ?loc.begin
+  brew tar
+  equipR compound
+  equipL trisk
+ :?DBash()
+  return
+ :?hp<=foe.damage
+  activate P
+:?loc=rocky
+ loc.Leave()
+
+
+func DBash()
+ return Dash() | Bash()
+func BDash()
+ return Bash() | Dash()
+func Dash()
+ return Shield("dash")
+func Bash()
+ return Shield("bash")
+
+func Shield(s)
+ ?item.GetCooldown(s)<=0 & foe.distance>10 & foe.distance<17
+  equipR @s@
+  equipl trisk
+  return true
+ return false
+
+`;
 
 const parser   = new StonescriptParser(api);
 const inputEl  = document.getElementById('input');
