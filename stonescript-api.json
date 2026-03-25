@@ -429,14 +429,33 @@
       "known_ability_ids": [
         "bardiche",
         "bash",
+        "blade",
         "cinderwisp",
         "compound",
         "dash",
-        "fire",
-        "fire_talisman",
+        "hatchet",
+        "heavy_hammer",
+        "lollipop_wand",
+        "mask",
         "mind",
-        "mind_stone",
-        "staff_fire"
+        "quarterstaff",
+        "shovel",
+        "skeleton_arm",
+        "staff_aether",
+        "staff_fire",
+        "staff_ice",
+        "staff_poison",
+        "staff_stone",
+        "staff_vigor",
+        "talisman_aether",
+        "talisman_fire",
+        "voidweaver",
+        "wand_aether",
+        "wand_fire",
+        "wand_ice",
+        "wand_poison",
+        "wand_stone",
+        "wand_vigor"
       ],
       "case_insensitive": true,
       "charset": "^[a-zA-Z_][a-zA-Z0-9_]*$",
@@ -655,7 +674,23 @@
     "opens_block": false,
     "examples": [
       ">`1,0,#green,ascii\n#.-.\n(   )\n#`-´\nasciiend"
-    ]
+    ],
+    "validate": {
+      "requires_asciiend": true,
+      "valid_after": [
+        "var_value",
+        "print_arg"
+      ],
+      "valid_after_ids": [
+        ">f",
+        ">h",
+        ">`",
+        ">c",
+        ">o",
+        ">("
+      ],
+      "note": "ascii...asciiend es un bloque multilínea para arte ASCII. Válido como valor de var (var x = ascii...) o como argumento de comandos print (>f, >h, >`...)."
+    }
   },
   {
     "id": "loc",
@@ -4615,6 +4650,49 @@
     ],
     "non_assignable_note": "Variables nativas selladas: sus raices no pueden ser asignadas directamente. foe=\"x\", totaltime=5, hp=0 etc. son errores.",
     "identifier_pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
-    "identifier_pattern_desc": "Identificadores validos: empiezan por letra o _, solo letras a-z A-Z, digitos 0-9 y _."
+    "identifier_pattern_desc": "Identificadores validos: empiezan por letra o _, solo letras a-z A-Z, digitos 0-9 y _.",
+    "valid_ability_ids": [
+      "bardiche",
+      "bash",
+      "blade",
+      "cinderwisp",
+      "compound",
+      "dash",
+      "hatchet",
+      "heavy_hammer",
+      "l",
+      "left",
+      "lollipop_wand",
+      "mask",
+      "mind",
+      "p",
+      "potion",
+      "quarterstaff",
+      "r",
+      "right",
+      "shovel",
+      "skeleton_arm",
+      "staff_aether",
+      "staff_fire",
+      "staff_ice",
+      "staff_poison",
+      "staff_stone",
+      "staff_vigor",
+      "talisman_aether",
+      "talisman_fire",
+      "voidweaver",
+      "wand_aether",
+      "wand_fire",
+      "wand_ice",
+      "wand_poison",
+      "wand_stone",
+      "wand_vigor"
+    ]
+  },
+  {
+    "id": "asciiend",
+    "type": "keyword",
+    "syntax": "asciiend",
+    "note": "Cierra un bloque ascii. Debe ir precedido de un bloque ascii abierto."
   }
 ]

@@ -7,7 +7,7 @@ const B = {
   COMMENT: 'comment', CONTINUE: 'continuation', COMMAND: 'command',
   PRINT: 'print', KEYWORD: 'keyword', FUNC_DEF: 'func_def',
   FOR_LOOP: 'for_loop', ASSIGN: 'assign', CALL: 'call',
-  EMPTY: 'empty', RAW: 'raw',
+  EMPTY: 'empty', RAW: 'raw', ASCII: 'ascii',
 };
 
 const T = {
@@ -33,11 +33,11 @@ const W = {
   SEALED_PROP:  'sealed_property',
   BAD_STATEMENT:'invalid_statement',
   BAD_EXPR:     'invalid_expression',
-  BAD_CONTINUE: 'invalid_continuation',
+  BAD_CONTINUE: 'invalid_continuation', BAD_ASCII: 'invalid_ascii',
 };
 
 const SCOPE_OPENERS = [B.CONDITION, B.ELSEIF, B.ELSE, B.FUNC_DEF, B.FOR_LOOP];
-const TRIVIAL_TYPES = [B.EMPTY, B.CONTINUE];
+const TRIVIAL_TYPES = [B.EMPTY, B.CONTINUE, B.COMMENT];
 
 // Characters never valid in a condition expression
 const INVALID_EXPR_CHARS = /[;]/;
@@ -135,6 +135,34 @@ class StonescriptParser {
   }
   toHtml(blocks) { return blocks.map(b => this._blockToHtml(b)).join('\n'); }
 
+  // ── ASCII BLOCK HELPERS ──────────────────────────────────────
+
+  _isAsciiBlock(content) {
+    const firstLine = content.split('\n')[0];
+    return /\bascii\s*$/.test(firstLine.split('//')[0]) && content.includes('\nasciiend');
+  }
+
+  _parseAsciiBlock(indent, content) {
+    const lines    = content.split('\n');
+    const firstLine = lines[0];
+    const artLines  = lines.slice(1, -1);
+    const warns     = [];
+
+    const asciiDef      = this.byId['ascii'];
+    const validAfterIds = (asciiDef && asciiDef.validate && asciiDef.validate.valid_after_ids) || [];
+    const isVarValue    = /^\s*var\s+/.test(firstLine);
+    const isPrintArg    = validAfterIds.some(id => firstLine.includes(id));
+
+    if (!isVarValue && !isPrintArg) {
+      warns.push(this._warn(W.BAD_ASCII,
+        "'ascii' solo es valido como valor de 'var' o argumento de un comando print (>f, >h, >`, etc.)."));
+    }
+
+    return this._block(B.ASCII, indent, content, [[T.KEYWORD, 'ascii']], {
+      name: 'ascii', value: artLines.join('\n'), prefix: firstLine, warnings: warns,
+    });
+  }
+
   // ── PASS 1A: LINE SPLITTING ───────────────────────────────
   _splitLines(code) {
     const lines = code.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
@@ -162,7 +190,19 @@ class StonescriptParser {
         }
         out.push(collected);
       } else {
-        out.push(line); i++;
+        // Collapse ascii...asciiend into a single block
+        const isAsciiStart = /\bascii\s*$/.test(line.split('//')[0]);
+        if (isAsciiStart) {
+          let collected = line; i++;
+          while (i < lines.length) {
+            collected += '\n' + lines[i];
+            if (lines[i].trimStart() === 'asciiend') { i++; break; }
+            i++;
+          }
+          out.push(collected);
+        } else {
+          out.push(line); i++;
+        }
       }
     }
     return out;
@@ -183,6 +223,9 @@ class StonescriptParser {
     if (rawLine.includes('\n')) {
       const indent = this._leadingSpaces(rawLine);
       const content = rawLine.trimStart();
+      if (this._isAsciiBlock(content)) {
+        return this._parseAsciiBlock(indent, content);
+      }
       return this._block(B.COMMENT, indent, content, [[T.COMMENT, content]]);
     }
     const indent  = this._leadingSpaces(rawLine);
@@ -358,7 +401,7 @@ class StonescriptParser {
           stack.pop();
         }
         const top = stack[stack.length - 1], si = stack.length - 1;
-        if (si === 0 && indent > 0)
+        if (si === 0 && indent > 0 && type !== B.COMMENT)
           blocks[bi].warnings.push(this._warn(W.ORPHAN, 'Espaciado inconsistente: no hay condicion ni funcion padre'));
         else if (top.childIndent === null) stack[si].childIndent = indent;
         else if (indent !== top.childIndent)
@@ -686,8 +729,13 @@ class StonescriptParser {
         `'${name}' es una variable nativa del juego y no puede usarse como nombre de variable.`)];
 
     // Junk after value: var test = aoeu aoeu
-    // If the value part contains unquoted spaces between words → junk
+    // Exception: var x = import Some/Path is valid (stored import reference)
     if (this.varValidate.no_junk_after_value && valPart) {
+      if (/^import\s/.test(valPart.trim())) {
+        const pathMatch = valPart.trim().match(/^import\s+(.*)/);
+        if (pathMatch) return this._checkImport(pathMatch[1]);
+        return [];
+      }
       const junk = this._detectExprJunk(valPart);
       if (junk) return [this._warn(W.BAD_VAR,
         `Valor de variable invalido: '${valPart}'. ` +
@@ -789,22 +837,39 @@ class StonescriptParser {
   // Rule: no trailing junk after condition expression
   // e.g. ?hp<foe.hp aoeu  → 'aoeu' has no operator before it
   // e.g. ?test() aeuo     → 'aeuo' follows ')' with no operator
+  // Rule: no trailing junk after condition expression
+  // Tokens inside function call parentheses are skipped (they are arguments, not junk)
+  // Rule: no trailing junk after condition expression
+  // Tokens inside () and [] are skipped. Dot as method separator resets context.
   _checkCondTrailingJunk(expr) {
     if (!expr || !this.condValidate.no_trailing_junk) return [];
     const tokens = this._tokenizeExpr(expr);
     let lastMeaningful = null;
+    let depth = 0;
     for (const [type, value] of tokens) {
       if (type === 'space' || type === 'comment') continue;
-      if (type === 'identifier' || type === 'variable') {
-        if (lastMeaningful && ['identifier','variable','number','string','paren'].includes(lastMeaningful)) {
+      if (type === 'paren') {
+        if (value === '(') { depth++; lastMeaningful = null; }
+        else { depth = Math.max(0, depth - 1); if (depth === 0) lastMeaningful = 'paren'; }
+        continue;
+      }
+      if (type === 'bracket') {
+        if (value === '[') { depth++; lastMeaningful = null; }
+        else { depth = Math.max(0, depth - 1); if (depth === 0) lastMeaningful = 'bracket'; }
+        continue;
+      }
+      if (depth === 0) {
+        // '.' as string is a method access separator — resets junk context
+        if (type === 'string' && value === '.') { lastMeaningful = null; continue; }
+        if ((type === 'identifier' || type === 'variable') &&
+            lastMeaningful &&
+            ['identifier','variable','number','string','paren','bracket'].includes(lastMeaningful)) {
           return [this._warn(W.BAD_EXPR,
             `Token inesperado en la condicion: '${value}'. ` +
             `Falta un operador (= ! < > <= >= & |) antes de este valor.`)];
         }
+        lastMeaningful = type;
       }
-      // Track close-paren as a value context; open-paren resets it
-      if (type === 'paren') lastMeaningful = value === ')' ? 'paren' : null;
-      else lastMeaningful = type;
     }
     return [];
   }
@@ -813,6 +878,7 @@ class StonescriptParser {
   _checkKeyword(lc, arg, def) {
     if (lc === 'import') return this._checkImport(arg);
     if (lc === 'var')    return this._checkVarDecl(arg);
+    if (lc === 'asciiend') return [this._warn(W.BAD_ASCII, "'asciiend' sin bloque 'ascii' previo.")];
     return [];
   }
   _checkCommand(lc, arg, def) {
@@ -846,6 +912,7 @@ class StonescriptParser {
   // ── PASS 2: HTML RENDERER ─────────────────────────────────
   _blockToHtml(block, depth = 0) {
     if (block.type === B.EMPTY) return '';
+    if (block.type === B.ASCII) return this._asciiBlockToHtml(block);
     const indent    = ' '.repeat(block.indent);
     const preWarns  = block.warnings
       .filter(w => w.type !== W.EMPTY_EXPR && w.type !== W.EMPTY_BLOCK)
@@ -860,6 +927,38 @@ class StonescriptParser {
     }
     return html;
   }
+  _asciiBlockToHtml(block) {
+    const lines  = (block.raw || '').split('\n');
+    const indent = ' '.repeat(block.indent);
+    const warns  = block.warnings.map(w => this._warnSpan('\u26a0', w.message)).join('');
+    const out    = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (i === 0) {
+        // First line: prefix tokens + ascii keyword
+        const m = line.match(/^(\s*)(.*?)\s*(ascii)\s*$/);
+        if (m) {
+          const pre = m[2] ? this._renderLineAsTokens(m[2].trim()) + ' ' : '';
+          out.push(indent + warns + pre + '<span class="keyword">ascii</span>');
+        } else {
+          out.push(indent + warns + this._esc(line));
+        }
+      } else if (line.trim() === 'asciiend') {
+        out.push(indent + '<span class="keyword">asciiend</span>');
+      } else {
+        out.push(indent + '<span class="string">' + this._esc(line) + '</span>');
+      }
+    }
+    return out.join('\n');
+  }
+
+  _renderLineAsTokens(code) {
+    if (!code) return '';
+    try {
+      return this._renderTokens(this._parseLine(code).tokens);
+    } catch(e) { return this._esc(code); }
+  }
+
   _renderTokens(tokens) {
     return tokens.map(([type, value]) =>
       type === T.SPACE ? this._esc(value || ' ') : `<span class="${type}">${this._esc(value)}</span>`

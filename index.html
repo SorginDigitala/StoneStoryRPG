@@ -38,7 +38,7 @@ body{background:var(--bg);color:#bbb;font-family:var(--font);font-size:var(--fs)
 #highlight{position:relative;display:block;min-width:100%;color:transparent;pointer-events:none;background:transparent;overflow:visible;}
 #input{position:absolute;top:0;left:0;width:100%;resize:none;background:transparent;color:rgba(0,0,0,0);caret-color:#bbb;overflow:hidden;z-index:2;}
 #input::selection{background:rgba(122,180,212,0.22);}
-.hl-line{display:block;}
+.hl-line{display:block;white-space:pre;}
 .hl-line.active{background:var(--line-active);}
 .hl-line.warn{background:var(--line-warn);}
 .control{color:#e0e0e0;font-weight:bold;}.comment{color:#4e6e4e;font-style:italic;}
@@ -251,9 +251,6 @@ function renderLineByLine(lines) {
 function renderBlocksNoWarnText(blocks) {
   function tokenHtml(type, value) {
     if (type === 'space') return esc(value || ' ');
-    // If a token spans multiple lines (only happens with block comments),
-    // wrap each line in its own span so no span ever crosses a newline.
-    // This prevents the browser from extending the colour across hl-line wrappers.
     if (value.includes('\n')) {
       return value.split('\n')
         .map(line => `<span class="${type}">${esc(line)}</span>`)
@@ -263,6 +260,9 @@ function renderBlocksNoWarnText(blocks) {
   }
   function blockHtml(b) {
     if (b.type === 'empty') return '';
+    // Delegate ascii blocks to the parser's renderer — it knows how to
+    // split the multiline raw into correctly coloured per-line spans.
+    if (b.type === 'ascii') return parser._asciiBlockToHtml(b);
     const indent = ' '.repeat(b.indent);
     const toks   = b.tokens.map(([type, value]) => tokenHtml(type, value)).join('');
     const kids   = b.children.map(blockHtml).filter(Boolean).join('\n');
@@ -387,16 +387,19 @@ function wordAtCursor() {
 
 function triggerAC() {
   const { word } = wordAtCursor();
-  if (word.length < 1) { closeAC(); return; }
+  // Show AC always (even with empty word — shows all entries)
   const lc = word.toLowerCase();
-  const matches = acData
-    .filter(e => e.id.toLowerCase().includes(lc))
-    .sort((a, b) => {
-      const ap = a.id.toLowerCase().startsWith(lc) ? 0 : 1;
-      const bp = b.id.toLowerCase().startsWith(lc) ? 0 : 1;
-      return ap - bp || a.id.length - b.id.length;
-    })
-    .slice(0, 40);
+  const matches = (lc.length === 0
+    ? acData.slice(0, 40)
+    : acData
+        .filter(e => e.id.toLowerCase().includes(lc))
+        .sort((a, b) => {
+          const ap = a.id.toLowerCase().startsWith(lc) ? 0 : 1;
+          const bp = b.id.toLowerCase().startsWith(lc) ? 0 : 1;
+          return ap - bp || a.id.length - b.id.length;
+        })
+        .slice(0, 40)
+  );
   if (!matches.length) { closeAC(); return; }
   acItems = matches; acSel = 0; acOpen = true;
   renderAC(); positionAC();
@@ -454,14 +457,14 @@ function hlMatch(str, q) {
 
 // ── Input events ──────────────────────────────────────────────
 inputEl.addEventListener('input', () => {
-  updateActiveLine(); scheduleRender();
+  updateActiveLine(); triggerAC(); scheduleRender();
 });
 
 inputEl.addEventListener('keydown', e => {
   if (acOpen) {
     if (e.key === 'ArrowDown') { e.preventDefault(); moveAC(1);  return; }
     if (e.key === 'ArrowUp')   { e.preventDefault(); moveAC(-1); return; }
-    if (e.key === 'Enter')     { e.preventDefault(); applyAC();  return; }
+    if (e.key === 'Enter')     { closeAC(); return; }  // Enter closes AC without applying
     if (e.key === 'Tab')       { e.preventDefault(); applyAC();  return; }
     if (e.key === 'Escape')    { e.preventDefault(); closeAC();  return; }
     // Cursor movement: close AC but let the key act normally (NO return, NO preventDefault)
