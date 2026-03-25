@@ -17,7 +17,7 @@
 html,body{height:100%;overflow:hidden;}
 body{background:var(--bg);color:#bbb;font-family:var(--font);font-size:var(--fs);display:flex;flex-direction:column;}
 #header{flex-shrink:0;display:flex;align-items:center;gap:16px;padding:8px 16px;background:var(--bg-header);border-bottom:1px solid var(--border2);user-select:none;}
-#header h1{font-size:11px;color:#555;font-weight:normal;letter-spacing:.12em;}
+#header h1{font-size:11px;color:#555;font-weight:normal;letter-spacing:.12em;}#share-btn{margin-left:auto;padding:3px 10px;font-size:10px;font-family:var(--font);background:none;border:1px solid #333;color:#555;cursor:pointer;letter-spacing:.08em;border-radius:2px;transition:border-color .15s,color .15s;}#share-btn:hover{border-color:#7ab4d4;color:#7ab4d4;}#share-btn.copied{border-color:var(--ok);color:var(--ok);}
 #status{margin-left:auto;font-size:11px;color:#444;}
 #status.ok{color:var(--ok);}#status.err{color:var(--err);}
 #body{flex:1;overflow:hidden;min-height:0;display:flex;flex-direction:column;}
@@ -66,7 +66,7 @@ body{background:var(--bg);color:#bbb;font-family:var(--font);font-size:var(--fs)
 </head>
 <body>
 <div id="loading">cargando stonescript-api.json…</div>
-<div id="header" style="display:none"><h1>·:·:· STONESCRIPT EDITOR ·:·:·</h1><div id="status"></div></div>
+<div id="header" style="display:none"><h1>·:·:· STONESCRIPT EDITOR ·:·:·</h1><div id="status"></div><button id="share-btn">⬡ share</button></div>
 <div id="body" style="display:none">
   <div id="editor-outer">
     <div id="gutter"><div id="gutter-inner"></div></div>
@@ -566,6 +566,34 @@ func Shield(s)
   equipl trisk
   return true
  return false`;
+
+// ── Share button ─────────────────────────────────────────────
+document.getElementById('share-btn').addEventListener('click', () => {
+  const code = inputEl.value;
+  const hash = encodeURIComponent(code);
+  const url  = location.href.split('#')[0] + '#' + hash;
+  navigator.clipboard.writeText(url).then(() => {
+    const btn = document.getElementById('share-btn');
+    btn.textContent = '✓ copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = '⬡ share';
+      btn.classList.remove('copied');
+    }, 2000);
+  }).catch(() => {
+    // Fallback: select a temp input
+    const tmp = document.createElement('input');
+    tmp.value = url;
+    document.body.appendChild(tmp);
+    tmp.select();
+    document.execCommand('copy');
+    document.body.removeChild(tmp);
+    const btn = document.getElementById('share-btn');
+    btn.textContent = '✓ copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = '⬡ share'; btn.classList.remove('copied'); }, 2000);
+  });
+});
 
 // Carga desde el hash de la URL: editor.html#?foe="pallas"%0A  equipR sword
 // Para generar el enlace: location.hash = encodeURIComponent(tuCodigo)
