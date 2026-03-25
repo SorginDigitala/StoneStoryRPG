@@ -15,7 +15,7 @@ const T = {
   COMMAND: 'command', KEYWORD: 'keyword', PRINT: 'print',
   VARIABLE: 'variable', FUNCTION: 'function', OPERATOR: 'operator',
   NUMBER: 'number', STRING: 'string', IDENTIFIER: 'identifier',
-  PAREN: 'paren', BRACKET: 'bracket', SPACE: 'space',
+  PAREN: 'paren', BRACKET: 'bracket', SPACE: 'space', UNKNOWN: 'unknown',
 };
 
 const W = {
@@ -34,6 +34,7 @@ const W = {
   BAD_STATEMENT:'invalid_statement',
   BAD_EXPR:     'invalid_expression',
   BAD_CONTINUE: 'invalid_continuation', BAD_ASCII: 'invalid_ascii',
+  BAD_ARG_TYPE:  'invalid_arg_type',  UNDECLARED_VAR: 'undeclared_variable',
 };
 
 const SCOPE_OPENERS = [B.CONDITION, B.ELSEIF, B.ELSE, B.FUNC_DEF, B.FOR_LOOP];
@@ -63,6 +64,8 @@ class StonescriptParser {
     this.keywordsNotInExpr       = new Set();
     this.nonAssignableRoots      = new Set();
     this.funcValidate            = {};
+    this.argTypeRules            = {};
+    this.argTypeCheckEnabled     = false;
     this.validConditionOps       = new Set(['=','!','&','|','>','<','>=','<=']);
 
     // Loaded from ?.validate
@@ -124,16 +127,176 @@ class StonescriptParser {
     this.abilityCharset = av.charset ? new RegExp(av.charset) : /^[a-zA-Z_][a-zA-Z0-9_]*$/;
     this.validAbilityIds = new Set([...this.abilityFixed, ...this.abilityKnown]);
     this.funcValidate    = (this.byId['func'] && this.byId['func'].validate) || {};
+    // Load arg type rules from __validation__.arg_type_rules
+    if (this.byId['__validation__']) {
+      const m = this.byId['__validation__'];
+      this.argTypeRules        = m.arg_type_rules        || {};
+      this.argTypeCheckEnabled = m.arg_type_check_enabled || false;
+    }
   }
 
   // ── PUBLIC API ────────────────────────────────────────────
   format(code) { return this.toHtml(this.parse(code)); }
   parse(code) {
-    const lines = this._splitLines(code);
-    const flat  = lines.map(l => this._parseLine(l));
-    return this._buildTree(flat);
+    const lines  = this._splitLines(code);
+    const flat   = lines.map(l => this._parseLine(l));
+    const tree   = this._buildTree(flat);
+    // Second pass: scope analysis — find declared vars, then validate usage
+    this._scopeAnalysis(tree);
+    return tree;
   }
   toHtml(blocks) { return blocks.map(b => this._blockToHtml(b)).join('\n'); }
+
+  // ── SCOPE ANALYSIS (second pass) ──────────────────────────────
+
+  _scopeAnalysis(blocks) {
+    // Pass A: collect all declared variable names and import roots
+    const declared    = new Set(); // user-declared: var x = ...
+    const importRoots = new Set(); // import references: var x = import y → x.*  is valid
+    (function collect(bs) {
+      for (const b of bs) {
+        if (b.type === 'keyword' && b.name === 'var' && b.value) {
+          const nameMatch = b.value.trim().match(/^([a-zA-Z_][a-zA-Z0-9_]*)/);
+          if (nameMatch) {
+            const name    = nameMatch[1];
+            const valPart = b.value.trim().slice(name.length).replace(/^\s*=\s*/, '');
+            if (/^import\s/.test(valPart.trim())) importRoots.add(name);
+            else declared.add(name);
+          }
+        }
+        // func name and params are declared
+        if (b.type === 'func_def' && b.value) {
+          // Add the function name itself so calls like DBash() are recognized
+          const nameM = b.value.match(/^([a-zA-Z_][a-zA-Z0-9_]*)/);
+          if (nameM) declared.add(nameM[1]);
+          // Add params
+          const paramsM = b.value.match(/\(([^)]*)\)/);
+          if (paramsM) paramsM[1].split(',').forEach(p => { const t = p.trim(); if (t) declared.add(t); });
+        }
+        // for loop variables
+        if (b.type === 'for_loop' && b.value) {
+          const m = b.value.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=/);
+          if (m) declared.add(m[1]);
+        }
+        collect(b.children);
+      }
+    })(blocks);
+
+    // Pass B: walk all blocks and check identifier tokens in expressions
+    const self = this;
+    (function check(bs) {
+      for (const b of bs) {
+        // Re-tokenize expressions to find unknown identifiers
+        // We do this by inspecting existing tokens of type T.IDENTIFIER
+        // that are not native vars, not declared, and not import roots
+        self._checkBlockIdentifiers(b, declared, importRoots);
+        check(b.children);
+      }
+    })(blocks);
+  }
+
+  _checkBlockIdentifiers(block, declared, importRoots) {
+    if (!block.tokens) return;
+
+    // Contexts where an identifier is NOT a variable reference:
+    // - Right-hand side of = in a comparison: ?foe=boss → 'boss' is a string value
+    // - Import path: var x=import Utils/File → 'Utils' is a path segment
+    // - Func definition name: func myFunc() → 'myFunc' is being defined
+    // - Func param names (already added to declared in scope collection)
+    // We skip tokens that follow an operator '=' or '!' in a condition context.
+
+    // Build a set of positions to skip (RHS of comparisons)
+    // After '=' or '!' skip ALL tokens until next logical operator (& |) or paren/bracket.
+    // Covers multi-word RHS: ?loc=haunted rocky → both 'haunted' and 'rocky' skipped.
+    const skipPositions = new Set();
+    const COMPARISON_OPS = new Set(['=', '!', '<', '>', '<=', '>=']);
+    const LOGICAL_OPS    = new Set(['&', '|']);
+    for (let i = 0; i < block.tokens.length; i++) {
+      const [t, v] = block.tokens[i];
+      if (t === T.OPERATOR && COMPARISON_OPS.has(v)) {
+        let j = i + 1;
+        while (j < block.tokens.length) {
+          const [tt, tv] = block.tokens[j];
+          if (tt === T.SPACE) { j++; continue; }
+          if (tt === T.OPERATOR && LOGICAL_OPS.has(tv)) break;
+          if (tt === T.PAREN || tt === T.BRACKET) break;
+          skipPositions.add(j); j++;
+        }
+      }
+    }
+
+    // func_def and for_loop: the identifier right after keyword is a definition name, not usage
+    const isDefinition = block.type === B.FUNC_DEF || block.type === B.FOR_LOOP;
+
+    // keyword 'import': the arg is a path, not a variable
+    const isImport = block.type === B.KEYWORD && block.name === 'import';
+
+    // keyword 'var': the name is being declared, value may reference other vars (checked separately)
+    const isVar = block.type === B.KEYWORD && block.name === 'var';
+
+    // Commands: their argument is a search_string, ability_id, etc. — not variable references
+    // We skip all IDENTIFIER tokens in the arg portion (after the command token)
+    const LITERAL_ARG_FOLLOWS = new Set(['search_string','ability_id','sound_id',
+      'hud_opts','ingredient_expr','script_path','print_args','string']);
+    const isLiteralArgCmd = block.type === B.COMMAND && block.def &&
+      LITERAL_ARG_FOLLOWS.has(block.def.follows);
+
+    // Print blocks: the argument is a formatted string, not a variable reference
+    const isPrint = block.type === B.PRINT;
+
+    // Condition with no comparison operator: ?a or ?loc.begin — bare boolean expression.
+    // In this case, an IDENTIFIER directly after '?' (with no operator) could be a valid
+    // user variable used as a boolean. We still warn, but only if there's no way it's valid.
+    // We track whether we've seen a comparison operator in the condition.
+    let condHasOperator = false;
+    if (block.type === B.CONDITION || block.type === B.ELSEIF) {
+      condHasOperator = block.tokens.some(([t,v]) =>
+        t === T.OPERATOR && new Set(['=','!','<','>','<=','>=']).has(v));
+    }
+
+    // Track position of the command keyword token to know when we're in the arg portion
+    let cmdArgStart = -1;
+    if (isLiteralArgCmd) {
+      for (let i = 0; i < block.tokens.length; i++) {
+        if (block.tokens[i][0] === T.COMMAND) { cmdArgStart = i + 1; break; }
+      }
+    }
+
+    for (let i = 0; i < block.tokens.length; i++) {
+      const [type, value] = block.tokens[i];
+      if (type !== T.IDENTIFIER) continue; // only check IDENTIFIER, not VARIABLE (natives are fine)
+      if (skipPositions.has(i)) continue;  // RHS of comparison — skip
+      if (isDefinition && i <= 2) continue; // func/for name token — skip
+      if (isImport) continue;               // entire arg is a path
+      if (isVar) continue;                  // var declaration tokens — skip entirely
+      if (isPrint) continue;                // print args are strings
+      if (isLiteralArgCmd && i >= cmdArgStart) continue; // command literal arg — skip
+      // Bare boolean condition: ?a with no operator — still warn (might be truly undeclared)
+      // but only after all other skips
+
+      // Skip boolean literals
+      if (value === 'true' || value === 'false') continue;
+      // Skip numeric-like
+      if (/^[^a-zA-Z_]/.test(value)) continue;
+      // Skip keywords
+      if (this.keywordSet.has(value.toLowerCase())) continue;
+      // Skip known natives
+      if (this.varRoots.includes(value.split('.')[0])) continue;
+      if (this.byId[value]) continue;
+      const def = this._lookupFuncOrVar(value);
+      if (def) continue;
+      // Skip import root properties (x.method where var x=import y)
+      const root = value.split('.')[0];
+      if (importRoots.has(root)) continue;
+      // Skip declared user variables
+      if (declared.has(root)) continue;
+
+      // Unknown identifier — warning
+      block.tokens[i] = [T.UNKNOWN, value];
+      block.warnings.push(this._warnW(W.UNDECLARED_VAR,
+        `'${value}' no esta declarado. Declara la variable con 'var ${value}' antes de usarla.`));
+    }
+  }
 
   // ── ASCII BLOCK HELPERS ──────────────────────────────────────
 
@@ -256,12 +419,23 @@ class StonescriptParser {
         [[T.CONTROL, ':?'], ...this._tokenizeExpr(after)], { value: expr, warnings });
     }
 
-    // : else — also matches '://comment' or ': // comment'
-    if (content === ':' || content.startsWith(': ') || content.startsWith('://') || content.startsWith(':/*')) {
-      const afterColon = content.slice(1).trim();
-      const tokens     = [[T.CONTROL, ':']];
-      if (afterColon) tokens.push(...this._tokenizeExpr(' ' + afterColon));
-      return this._block(B.ELSE, indent, content, tokens);
+    // : else — valid forms:
+    //   ':'           bare else
+    //   ': '          else with trailing space (before comment)
+    //   ':// ...'     else with inline // comment (no space required)
+    //   ':/* ... */'  else with inline /* comment
+    // Anything else after ':' (e.g. ':/foo', ':bar') is invalid.
+    if (content[0] === ':') {
+      const afterColon = content.slice(1);
+      const trimmed    = afterColon.trimStart();
+      const isValid    = afterColon === ''
+        || trimmed.startsWith('//')
+        || trimmed.startsWith('/*');
+      const tokens = [[T.CONTROL, ':']];
+      if (afterColon.trim()) tokens.push(...this._tokenizeExpr(afterColon));
+      const warns = isValid ? [] : [this._warn(W.BAD_EXPR,
+        `Sintaxis invalida tras ':'. Solo se permite ':' solo, ': // comentario' o ': /* comentario */'.`)];
+      return this._block(B.ELSE, indent, content, tokens, { warnings: warns });
     }
 
     // ? condition
@@ -309,15 +483,17 @@ class StonescriptParser {
 
     if (lc === 'func') {
       const sig      = rest.trimStart();
+      const spaces   = rest.slice(0, rest.length - rest.trimStart().length);
       const warnings = this._checkFuncSig(sig);
       return this._block(B.FUNC_DEF, indent, content,
-        [[T.KEYWORD, 'func'], [T.SPACE, ' '], ...this._tokenizeFuncSig(sig)],
+        [[T.KEYWORD, 'func'], [T.SPACE, spaces || ' '], ...this._tokenizeFuncSig(sig)],
         { name: 'func', value: sig, warnings });
     }
     if (lc === 'for') {
-      const expr = rest.trimStart();
+      const expr   = rest.trimStart();
+      const spaces = rest.slice(0, rest.length - rest.trimStart().length);
       return this._block(B.FOR_LOOP, indent, content,
-        [[T.KEYWORD, 'for'], [T.SPACE, ' '], ...this._tokenizeExpr(expr)],
+        [[T.KEYWORD, 'for'], [T.SPACE, spaces || ' '], ...this._tokenizeExpr(expr)],
         { name: 'for', value: expr });
     }
     if (this.keywords.includes(lc)) {
@@ -361,6 +537,7 @@ class StonescriptParser {
     const tokens   = [...this._resolveIdentToken(name), ...this._tokenizeCallArgs(rest, def)];
     const warnings = [
       ...((def && def.args && !def.overloads) ? this._checkArgCount(def, rest) : []),
+      ...((def && def.args && !def.overloads) ? this._checkArgTypes(def, rest) : []),
       ...this._checkSealedProp(name),
       ...this._checkCallTrailingJunk(rest),
     ];
@@ -493,7 +670,15 @@ class StonescriptParser {
             if (ch === '(') depth++; else if (ch === ')') depth--;
             pos++;
           }
-          tokens.push(...this._tokenizeCallArgs(inner, def)); continue;
+          tokens.push(...this._tokenizeCallArgs(inner, def));
+        // Arg count + type check inline (e.g. inside condition expressions)
+        if (def && def.args && !def.overloads) {
+          if (!this._inlineArgWarnings) this._inlineArgWarnings = [];
+          const callStr = '(' + inner.slice(1); // inner already starts with '('
+          this._checkArgCount(def, callStr).forEach(w => this._inlineArgWarnings.push(w));
+          this._checkArgTypes(def, callStr).forEach(w => this._inlineArgWarnings.push(w));
+        }
+        continue;
         }
         tokens.push(...this._resolveIdentToken(word)); continue;
       }
@@ -573,6 +758,7 @@ class StonescriptParser {
   _checkConditionExpr(expr) {
     if (!expr) return [];
     const warns = [];
+    this._inlineArgWarnings = []; // reset before tokenizing this expression
 
     // Semicolons (and other explicitly invalid chars)
     if (INVALID_EXPR_CHARS.test(expr))
@@ -627,6 +813,12 @@ class StonescriptParser {
 
     // Trailing junk (e.g. ?hp<foe.hp aoeu)
     warns.push(...this._checkCondTrailingJunk(expr));
+
+    // Collect any inline arg type warnings from _tokenizeExpr
+    if (this._inlineArgWarnings && this._inlineArgWarnings.length) {
+      warns.push(...this._inlineArgWarnings);
+      this._inlineArgWarnings = [];
+    }
 
     return warns;
   }
@@ -907,6 +1099,65 @@ class StonescriptParser {
     if (!required) return [];
     return [this._warn(W.BAD_FOLLOW, `'${def.id}' requiere un argumento (${def.follows})`)];
   }
+  // Validate argument types against the function signature (data-driven from JSON)
+  // Only checks literal values — variables/expressions are always accepted.
+  _checkArgTypes(def, callStr) {
+    if (!this.argTypeCheckEnabled || !def.args) return [];
+    const m = callStr.trim().match(/^\((.*?)\)$/s);
+    if (!m) return [];
+    const inner = m[1].trim();
+    if (!inner) return [];
+
+    // Split args respecting nested parens/brackets
+    const rawArgs = [];
+    let depth = 0, cur = '';
+    for (const ch of inner + ',') {
+      if (ch === '(' || ch === '[') { depth++; cur += ch; }
+      else if (ch === ')' || ch === ']') { depth--; cur += ch; }
+      else if (ch === ',' && depth === 0) { rawArgs.push(cur.trim()); cur = ''; }
+      else cur += ch;
+    }
+
+    const warns = [];
+    for (let i = 0; i < Math.min(rawArgs.length, def.args.length); i++) {
+      const argDef  = def.args[i];
+      const argVal  = rawArgs[i];
+      if (!argVal || !argDef.type) continue;
+
+      // Determine the token type of the literal value
+      const tokenType = this._classifyArgValue(argVal);
+      if (!tokenType) continue;      // complex expression — skip
+      if (tokenType === 'variable') continue; // variable — type unknown at parse time, skip
+
+      const rules = this.argTypeRules[argDef.type];
+      if (!rules) continue; // unknown type — skip
+
+      const validTokens = rules.valid_tokens || [];
+      if (!validTokens.includes(tokenType)) {
+        // bool: 'true'/'false' are classified as 'bool' by _classifyArgValue
+        if (argDef.type === 'bool' && tokenType === 'bool') continue;
+        // number/int/float: all accept numeric literals
+        if (['number','int','float'].includes(argDef.type) && tokenType === 'number') continue;
+        warns.push(this._warn(W.BAD_ARG_TYPE,
+          `Argumento '${argDef.name}' de '${def.id}': se esperaba ${argDef.type}, ` +
+          `se recibio ${tokenType} ('${argVal.slice(0,20)}')`));
+      }
+    }
+    return warns;
+  }
+
+  // Classify a single argument value as a token type.
+  // Returns null if the value is a complex expression (safe to skip type check).
+  _classifyArgValue(val) {
+    const v = val.trim();
+    if (!v) return null;
+    if (/^".*"$/.test(v) || /^'.*'$/.test(v)) return 'string'; // string literal
+    if (/^-?\d+(\.\d+)?$/.test(v)) return 'number';           // numeric literal
+    if (v === 'true' || v === 'false') return 'bool';
+    if (/^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(v)) return 'variable'; // simple var/func name
+    return null; // complex expression — skip
+  }
+
   _checkArgCount(def, callStr) {
     const m = callStr.trim().match(/^\((.*)\)$/s);
     if (!m) return [];
@@ -927,12 +1178,15 @@ class StonescriptParser {
     if (block.type === B.ASCII) return this._asciiBlockToHtml(block);
     const indent    = ' '.repeat(block.indent);
     const preWarns  = block.warnings
-      .filter(w => w.type !== W.EMPTY_EXPR && w.type !== W.EMPTY_BLOCK)
-      .map(w => this._warnSpan('⚠', w.message)).join('');
+      .filter(w => w.type !== W.EMPTY_EXPR && w.type !== W.EMPTY_BLOCK && w.severity !== 'warning')
+      .map(w => this._warnSpan('\u26a0', w.message, 'error')).join('');
+    const preWarnsW = block.warnings
+      .filter(w => w.type !== W.EMPTY_EXPR && w.type !== W.EMPTY_BLOCK && w.severity === 'warning')
+      .map(w => this._warnSpan('\u25b2', w.message, 'warning')).join('');
     const postWarns = block.warnings
-      .filter(w => w.type === W.EMPTY_EXPR || w.type === W.EMPTY_BLOCK)
-      .map(w => this._warnSpan('?', w.message)).join('');
-    let html = indent + preWarns + this._renderTokens(block.tokens) + postWarns;
+      .filter(w => (w.type === W.EMPTY_EXPR || w.type === W.EMPTY_BLOCK) && w.severity !== 'warning')
+      .map(w => this._warnSpan('?', w.message, 'error')).join('');
+    let html = indent + preWarns + preWarnsW + this._renderTokens(block.tokens) + postWarns;
     for (const child of block.children) {
       const ch = this._blockToHtml(child, depth + 1);
       if (ch !== '') html += '\n' + ch;
@@ -982,8 +1236,9 @@ class StonescriptParser {
       type === T.SPACE ? this._esc(value || ' ') : `<span class="${type}">${this._esc(value)}</span>`
     ).join('');
   }
-  _warnSpan(text, msg) {
-    return `<span class="warning" data-warning="${this._esc(msg)}">${this._esc(text)}</span>`;
+  _warnSpan(text, msg, severity = 'error') {
+    const cls = severity === 'warning' ? 'warning-w' : 'warning';
+    return `<span class="${cls}" data-warning="${this._esc(msg)}">${this._esc(text)}</span>`;
   }
   _esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -994,7 +1249,8 @@ class StonescriptParser {
     return { type, indent, raw, tokens, def: null, name: null, value: null,
              children: [], warnings: [], ...extra };
   }
-  _warn(type, message) { return { type, message }; }
+  _warn(type, message, severity = 'error') { return { type, message, severity }; }
+  _warnW(type, message) { return this._warn(type, message, 'warning'); }
   _leadingSpaces(line) {
     let i = 0;
     while (i < line.length && line[i] === ' ') i++;

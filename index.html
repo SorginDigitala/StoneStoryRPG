@@ -40,7 +40,7 @@ body{background:var(--bg);color:#bbb;font-family:var(--font);font-size:var(--fs)
 #input::selection{background:rgba(122,180,212,0.22);}
 .hl-line{display:block;white-space:pre;}
 .hl-line.active{background:var(--line-active);}
-.hl-line.warn{background:var(--line-warn);}
+.hl-line.warn{background:var(--line-warn);}.hl-line.warn-w{background:rgba(200,160,32,0.07);}
 .control{color:#e0e0e0;font-weight:bold;}.comment{color:#4e6e4e;font-style:italic;}
 .continue-op{color:#666;}.command{color:#9acdaa;}.keyword{color:var(--accent);}
 .print{color:#9acdaa;font-weight:bold;}.variable{color:#c8c8c8;}.function{color:#5ab4d4;}
@@ -282,7 +282,7 @@ function collectWarnings(blocks, lines) {
         for (let i = 0; i < lines.length; i++) {
           if (lines[i].trim() === t) { ln = i; break; }
         }
-        b.warnings.forEach(w => out.push({line: ln, message: w.message}));
+        b.warnings.forEach(w => out.push({line: ln, message: w.message, severity: w.severity || 'error'}));
       }
       if (b.children) walk(b.children);
     }
@@ -292,12 +292,14 @@ function collectWarnings(blocks, lines) {
 
 // ── Build highlight ───────────────────────────────────────────
 function buildHighlight(lines, colorLines) {
-  const warnSet = new Set(warnings.map(w => w.line));
+  const errSetH = new Set(warnings.filter(w => w.severity !== 'warning').map(w => w.line));
+  const warnSet = new Set(warnings.filter(w => w.severity === 'warning').map(w => w.line));
   let html = '';
   for (let i = 0; i < lines.length; i++) {
     let cls = 'hl-line';
     if (i === activeLine) cls += ' active';
-    if (warnSet.has(i))   cls += ' warn';
+    if (errSetH.has(i))      cls += ' warn';
+    else if (warnSet.has(i)) cls += ' warn-w';
     // ​ keeps empty lines at full line-height
     html += `<span class="${cls}">${colorLines[i] || '\u200b'}\n</span>`;
   }
@@ -312,12 +314,14 @@ function buildHighlight(lines, colorLines) {
 
 // ── Build gutter ──────────────────────────────────────────────
 function buildGutter(lines) {
-  const warnSet = new Set(warnings.map(w => w.line));
+  const errSet  = new Set(warnings.filter(w => w.severity !== 'warning').map(w => w.line));
+  const warnSet = new Set(warnings.filter(w => w.severity === 'warning').map(w => w.line));
   let html = '';
   for (let i = 0; i < lines.length; i++) {
     let cls = 'gn';
     if (i === activeLine) cls += ' act';
-    if (warnSet.has(i))   cls += ' warn';
+    if (errSet.has(i))       cls += ' warn';
+    else if (warnSet.has(i)) cls += ' warn-w';
     html += `<span class="${cls}" data-ln="${i}">${i + 1}</span>`;
   }
   gutterIn.innerHTML = html;
@@ -326,11 +330,11 @@ function buildGutter(lines) {
 // ── Build warn panel ──────────────────────────────────────────
 function buildWarnPanel() {
   wcEl.textContent = warnings.length || '';
-  wlist.innerHTML  = warnings.map(w =>
-    `<div class="we" data-ln="${w.line}">` +
-    `<span class="we-ln">L${w.line + 1}</span>` +
-    `<span>${esc(w.message)}</span></div>`
-  ).join('');
+  wlist.innerHTML  = warnings.map(w => {
+    const cls  = 'we' + (w.severity === 'warning' ? ' ww' : '');
+    const icon = w.severity === 'warning' ? '▲' : '⚠';
+    return `<div class="${cls}" data-ln="${w.line}"><span class="we-ln">${icon} L${w.line + 1}</span><span>${esc(w.message)}</span></div>`;
+  }).join('');
   wlist.querySelectorAll('.we').forEach(el =>
     el.addEventListener('click', () => goToLine(+el.dataset.ln))
   );

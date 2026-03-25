@@ -4598,7 +4598,9 @@
       "|",
       "(",
       ".",
-      "["
+      "[",
+      "]",
+      ","
     ],
     "continuation_note": "Una linea ^ debe empezar con & o | (conectores logicos) o con ( o . (continuacion de expresion/llamada).",
     "keywords_not_allowed_in_expr": [
@@ -4688,7 +4690,79 @@
       "wand_poison",
       "wand_stone",
       "wand_vigor"
-    ]
+    ],
+    "arg_type_rules": {
+      "string": {
+        "valid_tokens": [
+          "string"
+        ],
+        "valid_arg_tokens": [
+          "variable",
+          "identifier",
+          "function"
+        ],
+        "note": "Requiere string literal (\"...\") o variable/expresión"
+      },
+      "int": {
+        "valid_tokens": [
+          "number"
+        ],
+        "valid_arg_tokens": [
+          "variable",
+          "identifier",
+          "function",
+          "operator"
+        ],
+        "integer_only": true,
+        "note": "Requiere número entero o variable/expresión"
+      },
+      "float": {
+        "valid_tokens": [
+          "number"
+        ],
+        "valid_arg_tokens": [
+          "variable",
+          "identifier",
+          "function",
+          "operator"
+        ],
+        "note": "Requiere número o variable/expresión"
+      },
+      "number": {
+        "valid_tokens": [
+          "number"
+        ],
+        "valid_arg_tokens": [
+          "variable",
+          "identifier",
+          "function",
+          "operator"
+        ],
+        "note": "Requiere número o variable/expresión"
+      },
+      "bool": {
+        "valid_tokens": [
+          "identifier",
+          "variable"
+        ],
+        "valid_literals": [
+          "true",
+          "false"
+        ],
+        "note": "Requiere true, false o variable"
+      },
+      "any": {
+        "valid_tokens": [
+          "string",
+          "number",
+          "variable",
+          "identifier",
+          "function"
+        ],
+        "note": "Acepta cualquier tipo"
+      }
+    },
+    "arg_type_check_enabled": true
   },
   {
     "id": "asciiend",
