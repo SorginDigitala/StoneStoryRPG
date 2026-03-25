@@ -66,6 +66,10 @@ class StonescriptParser {
     this.funcValidate            = {};
     this.argTypeRules            = {};
     this.argTypeCheckEnabled     = false;
+    this.comparisonOps           = new Set(['=','!','<','>','<=','>=']);
+    this.logicalOps              = new Set(['&','|']);
+    this.literalArgFollows       = new Set(['search_string','ability_id','sound_id','hud_opts','ingredient_expr','script_path','print_args','string']);
+    this.exitKeywords            = new Set(['return','break']);
     this.validConditionOps       = new Set(['=','!','&','|','>','<','>=','<=']);
 
     // Loaded from ?.validate
@@ -127,11 +131,23 @@ class StonescriptParser {
     this.abilityCharset = av.charset ? new RegExp(av.charset) : /^[a-zA-Z_][a-zA-Z0-9_]*$/;
     this.validAbilityIds = new Set([...this.abilityFixed, ...this.abilityKnown]);
     this.funcValidate    = (this.byId['func'] && this.byId['func'].validate) || {};
+    // Add known module roots (battle, loop, ui, etc.) to varRoots so their
+    // methods are not flagged as undeclared (data-driven from __validation__)
+    if (this.byId['__validation__']) {
+      const moduleRoots = this.byId['__validation__'].known_module_roots || [];
+      for (const r of moduleRoots) {
+        if (!this.varRoots.includes(r)) this.varRoots.push(r);
+      }
+    }
     // Load arg type rules from __validation__.arg_type_rules
     if (this.byId['__validation__']) {
       const m = this.byId['__validation__'];
       this.argTypeRules        = m.arg_type_rules        || {};
       this.argTypeCheckEnabled = m.arg_type_check_enabled || false;
+      this.comparisonOps       = new Set(m.comparison_operators  || ['=','!','<','>','<=','>=']);
+      this.logicalOps          = new Set(m.logical_operators      || ['&','|']);
+      this.literalArgFollows   = new Set(m.literal_arg_follows    || []);
+      this.exitKeywords        = new Set(m.exit_keywords           || ['return','break']);
     }
   }
 
@@ -139,7 +155,15 @@ class StonescriptParser {
   format(code) { return this.toHtml(this.parse(code)); }
   parse(code) {
     const lines  = this._splitLines(code);
-    const flat   = lines.map(l => this._parseLine(l));
+    // Track source line number for each split block
+    // A split block may span multiple source lines (e.g. /* */ or ascii)
+    let srcLine = 0;
+    const flat = lines.map(l => {
+      const b      = this._parseLine(l);
+      b.lineNum    = srcLine;
+      srcLine     += (l.match(/\n/g) || []).length + 1;
+      return b;
+    });
     const tree   = this._buildTree(flat);
     // Second pass: scope analysis — find declared vars, then validate usage
     this._scopeAnalysis(tree);
@@ -173,9 +197,9 @@ class StonescriptParser {
           const paramsM = b.value.match(/\(([^)]*)\)/);
           if (paramsM) paramsM[1].split(',').forEach(p => { const t = p.trim(); if (t) declared.add(t); });
         }
-        // for loop variables
+        // for loop variables — both 'for v = a..b' and 'for v : array'
         if (b.type === 'for_loop' && b.value) {
-          const m = b.value.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=/);
+          const m = b.value.match(/^([a-zA-Z_][a-zA-Z0-9_]*)\s*[=:]/);
           if (m) declared.add(m[1]);
         }
         collect(b.children);
@@ -197,6 +221,8 @@ class StonescriptParser {
 
   _checkBlockIdentifiers(block, declared, importRoots) {
     if (!block.tokens) return;
+    // If block already has unknown_command error, skip undeclared check — it's redundant
+    if (block.warnings.some(w => w.type === W.UNKNOWN_CMD)) return;
 
     // Contexts where an identifier is NOT a variable reference:
     // - Right-hand side of = in a comparison: ?foe=boss → 'boss' is a string value
@@ -209,8 +235,8 @@ class StonescriptParser {
     // After '=' or '!' skip ALL tokens until next logical operator (& |) or paren/bracket.
     // Covers multi-word RHS: ?loc=haunted rocky → both 'haunted' and 'rocky' skipped.
     const skipPositions = new Set();
-    const COMPARISON_OPS = new Set(['=', '!', '<', '>', '<=', '>=']);
-    const LOGICAL_OPS    = new Set(['&', '|']);
+    const COMPARISON_OPS = this.comparisonOps;
+    const LOGICAL_OPS    = this.logicalOps;
     for (let i = 0; i < block.tokens.length; i++) {
       const [t, v] = block.tokens[i];
       if (t === T.OPERATOR && COMPARISON_OPS.has(v)) {
@@ -236,8 +262,7 @@ class StonescriptParser {
 
     // Commands: their argument is a search_string, ability_id, etc. — not variable references
     // We skip all IDENTIFIER tokens in the arg portion (after the command token)
-    const LITERAL_ARG_FOLLOWS = new Set(['search_string','ability_id','sound_id',
-      'hud_opts','ingredient_expr','script_path','print_args','string']);
+    const LITERAL_ARG_FOLLOWS = this.literalArgFollows;
     const isLiteralArgCmd = block.type === B.COMMAND && block.def &&
       LITERAL_ARG_FOLLOWS.has(block.def.follows);
 
@@ -251,7 +276,7 @@ class StonescriptParser {
     let condHasOperator = false;
     if (block.type === B.CONDITION || block.type === B.ELSEIF) {
       condHasOperator = block.tokens.some(([t,v]) =>
-        t === T.OPERATOR && new Set(['=','!','<','>','<=','>=']).has(v));
+        t === T.OPERATOR && this.comparisonOps.has(v));
     }
 
     // Track position of the command keyword token to know when we're in the arg portion
@@ -271,6 +296,28 @@ class StonescriptParser {
       if (isVar) continue;                  // var declaration tokens — skip entirely
       if (isPrint) continue;                // print args are strings
       if (isLiteralArgCmd && i >= cmdArgStart) continue; // command literal arg — skip
+      // Method access: identifier after '.' is a method call on an object.
+      // If the receiver is a variable/paren (e.g. x.Method(), obj.f()) → skip (opaque).
+      // If the receiver is ']' (array literal [].Method()) → check against known array methods.
+      {
+        let prevMeaningful = null, prevPrev = null;
+        for (let j = i - 1; j >= 0; j--) {
+          if (block.tokens[j][0] === T.SPACE) continue;
+          if (!prevMeaningful) { prevMeaningful = block.tokens[j]; continue; }
+          prevPrev = block.tokens[j]; break;
+        }
+        if (prevMeaningful && prevMeaningful[0] === T.STRING && prevMeaningful[1] === '.') {
+          // After '.': if receiver is ']' → array literal, check if method exists
+          if (prevPrev && prevPrev[0] === T.BRACKET && prevPrev[1] === ']') {
+            // Array literal method — check it's a known array function
+            const arrayMethod = 'array.' + value;
+            if (this.byId[arrayMethod] || this._lookupFuncOrVar(arrayMethod)) continue;
+            // Unknown array method — fall through to undeclared check
+          } else {
+            continue; // variable/object method — skip (type unknown at parse time)
+          }
+        }
+      }
       // Bare boolean condition: ?a with no operator — still warn (might be truly undeclared)
       // but only after all other skips
 
@@ -324,6 +371,12 @@ class StonescriptParser {
     return this._block(B.ASCII, indent, content, [[T.KEYWORD, 'ascii']], {
       name: 'ascii', value: artLines.join('\n'), prefix: firstLine, warnings: warns,
     });
+  }
+
+  _flushInlineWarnings() {
+    const w = this._inlineArgWarnings || [];
+    this._inlineArgWarnings = [];
+    return w;
   }
 
   // ── PASS 1A: LINE SPLITTING ───────────────────────────────
@@ -474,7 +527,10 @@ class StonescriptParser {
     }
 
     if (/^[a-zA-Z_]/.test(content)) return this._parseWordLine(indent, content);
-    return this._block(B.RAW, indent, content, this._tokenizeExpr(content));
+    this._inlineArgWarnings = [];
+    const rawTokens = this._tokenizeExpr(content);
+    const rawWarns  = this._flushInlineWarnings();
+    return this._block(B.RAW, indent, content, rawTokens, { warnings: rawWarns });
   }
 
   _parseWordLine(indent, content) {
@@ -540,6 +596,7 @@ class StonescriptParser {
       ...((def && def.args && !def.overloads) ? this._checkArgTypes(def, rest) : []),
       ...this._checkSealedProp(name),
       ...this._checkCallTrailingJunk(rest),
+      ...this._flushInlineWarnings(),
     ];
     return this._block(B.CALL, indent, content, tokens, { name, value: rest, def, warnings });
   }
@@ -617,6 +674,7 @@ class StonescriptParser {
     b.children = b.children.map(ci => this._nestBlock(blocks, ci));
     return b;
   }
+  // lineNum is already set on each block in parse()
 
   // ── TOKENIZERS ────────────────────────────────────────────
   _tokenizeExpr(expr) {
@@ -661,8 +719,20 @@ class StonescriptParser {
       if (/[a-zA-Z_]/.test(c)) {
         const wm = rest.match(/^[a-zA-Z_][a-zA-Z0-9_.]*/), word = wm[0];
         pos += word.length;
+        // 'import' in an expression (e.g. var x = import Path) → keyword (blue)
+        if (word.toLowerCase() === 'import') { tokens.push([T.KEYWORD, word]); continue; }
         if (pos < expr.length && expr[pos] === '(') {
-          const def = this._lookupFuncOrVar(word);
+          // Try direct lookup, then 'array.X' if previous meaningful token was ']'.'
+          let def = this._lookupFuncOrVar(word);
+          if (!def) {
+            // Check if last meaningful token was '.' following ']' → array method
+            const lastTok = tokens.length ? tokens[tokens.length - 1] : null;
+            const prevTok = tokens.length > 1 ? tokens[tokens.length - 2] : null;
+            if (lastTok && lastTok[0] === T.STRING && lastTok[1] === '.' &&
+                prevTok && prevTok[0] === T.BRACKET && prevTok[1] === ']') {
+              def = this._lookupFuncOrVar('array.' + word);
+            }
+          }
           tokens.push([(def && def.type === 'func') ? T.FUNCTION : T.IDENTIFIER, word]);
           let depth = 1, inner = '('; pos++;
           while (pos < expr.length && depth > 0) {
@@ -671,14 +741,14 @@ class StonescriptParser {
             pos++;
           }
           tokens.push(...this._tokenizeCallArgs(inner, def));
-        // Arg count + type check inline (e.g. inside condition expressions)
-        if (def && def.args && !def.overloads) {
-          if (!this._inlineArgWarnings) this._inlineArgWarnings = [];
-          const callStr = '(' + inner.slice(1); // inner already starts with '('
-          this._checkArgCount(def, callStr).forEach(w => this._inlineArgWarnings.push(w));
-          this._checkArgTypes(def, callStr).forEach(w => this._inlineArgWarnings.push(w));
-        }
-        continue;
+          // Arg count + type check inline
+          if (def && def.args && !def.overloads) {
+            if (!this._inlineArgWarnings) this._inlineArgWarnings = [];
+            const callStr = '(' + inner.slice(1);
+            this._checkArgCount(def, callStr).forEach(w => this._inlineArgWarnings.push(w));
+            this._checkArgTypes(def, callStr).forEach(w => this._inlineArgWarnings.push(w));
+          }
+          continue;
         }
         tokens.push(...this._resolveIdentToken(word)); continue;
       }
@@ -1051,8 +1121,8 @@ class StonescriptParser {
     let lastMeaningful = null;
     let depth    = 0;
     let inRHS    = false; // after a comparison op, skip until logical op or end
-    const COMPARISON_OPS = new Set(['=', '!', '<', '>', '<=', '>=']);
-    const LOGICAL_OPS    = new Set(['&', '|']);
+    const COMPARISON_OPS = this.comparisonOps;
+    const LOGICAL_OPS    = this.logicalOps;
     for (const [type, value] of tokens) {
       if (type === 'space' || type === 'comment') continue;
       if (type === 'paren') {
@@ -1263,9 +1333,15 @@ class StonescriptParser {
   _warn(type, message, severity = 'error') { return { type, message, severity }; }
   _warnW(type, message) { return this._warn(type, message, 'warning'); }
   _leadingSpaces(line) {
-    let i = 0;
-    while (i < line.length && line[i] === ' ') i++;
-    return i;
+    // Normalize tabs to 2 spaces before counting indent.
+    // This ensures tabs and spaces are interchangeable for indentation.
+    let count = 0;
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === ' ')  { count++; }
+      else if (line[i] === '\t') { count += 2; }
+      else break;
+    }
+    return count;
   }
 }
 

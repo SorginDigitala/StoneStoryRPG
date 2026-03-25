@@ -4402,7 +4402,8 @@
     "return_type": "int",
     "examples": [
       "var count = myArray.Count()"
-    ]
+    ],
+    "args": []
   },
   {
     "id": "array.Clear",
@@ -4411,7 +4412,8 @@
     "return_type": "void",
     "examples": [
       "clearedEachFrame.Clear()"
-    ]
+    ],
+    "args": []
   },
   {
     "id": "array[index]",
@@ -4762,12 +4764,81 @@
         "note": "Acepta cualquier tipo"
       }
     },
-    "arg_type_check_enabled": true
+    "arg_type_check_enabled": true,
+    "comparison_operators": [
+      "=",
+      "!",
+      "<",
+      ">",
+      "<=",
+      ">="
+    ],
+    "logical_operators": [
+      "&",
+      "|"
+    ],
+    "literal_arg_follows": [
+      "search_string",
+      "ability_id",
+      "sound_id",
+      "hud_opts",
+      "ingredient_expr",
+      "script_path",
+      "print_args",
+      "string"
+    ],
+    "keyword_special_handlers": {
+      "import": "checkImport",
+      "var": "checkVarDecl",
+      "asciiend": "errorAsciiend",
+      "activate": "checkActivate"
+    },
+    "exit_keywords": [
+      "return",
+      "break"
+    ],
+    "known_module_roots": [
+      "ambient",
+      "battle",
+      "color",
+      "draw",
+      "event",
+      "key",
+      "loc",
+      "loop",
+      "math",
+      "music",
+      "screen",
+      "storage",
+      "string",
+      "summon",
+      "sys",
+      "te",
+      "time",
+      "ui",
+      "utc"
+    ]
   },
   {
     "id": "asciiend",
     "type": "keyword",
     "syntax": "asciiend",
     "note": "Cierra un bloque ascii. Debe ir precedido de un bloque ascii abierto."
+  },
+  {
+    "id": "array.Contains",
+    "type": "func",
+    "group": "array",
+    "return_type": "bool",
+    "args": [
+      {
+        "name": "value",
+        "type": "any",
+        "optional": false
+      }
+    ],
+    "examples": [
+      "?[\"a\",\"b\",\"c\"].Contains(\"b\")\n  return"
+    ]
   }
 ]
