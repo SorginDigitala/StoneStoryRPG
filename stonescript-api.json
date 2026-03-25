@@ -4597,7 +4597,8 @@
       "&",
       "|",
       "(",
-      "."
+      ".",
+      "["
     ],
     "continuation_note": "Una linea ^ debe empezar con & o | (conectores logicos) o con ( o . (continuacion de expresion/llamada).",
     "keywords_not_allowed_in_expr": [

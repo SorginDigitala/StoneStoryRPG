@@ -386,12 +386,29 @@ function wordAtCursor() {
 }
 
 function triggerAC() {
-  const { word } = wordAtCursor();
-  // Show AC always (even with empty word — shows all entries)
+  const { word, start: wStart } = wordAtCursor();
   const lc = word.toLowerCase();
+
+  // Context-aware: if cursor follows a command with known valid_values, filter to those
+  const lineStart = inputEl.value.slice(
+    inputEl.value.lastIndexOf('\n', wStart - 1) + 1, wStart
+  ).trimStart();
+  const contextCmd = lineStart.match(/^([a-zA-Z]+)\s+$/);
+  let contextPool = null;
+  if (contextCmd) {
+    const cmdName = contextCmd[1].toLowerCase();
+    const cmdDef  = api.find(e => e.type === 'command' && e.id.toLowerCase() === cmdName);
+    if (cmdDef && cmdDef.arg_validation) {
+      const av  = cmdDef.arg_validation;
+      const all = [...(av.fixed_values || []), ...(av.known_ability_ids || [])];
+      if (all.length) contextPool = all.map(v => ({ id: v, type: 'ability_id', ret: '' }));
+    }
+  }
+
+  const pool = contextPool || acData;
   const matches = (lc.length === 0
-    ? acData.slice(0, 40)
-    : acData
+    ? pool.slice(0, 40)
+    : pool
         .filter(e => e.id.toLowerCase().includes(lc))
         .sort((a, b) => {
           const ap = a.id.toLowerCase().startsWith(lc) ? 0 : 1;

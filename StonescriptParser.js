@@ -196,7 +196,7 @@ class StonescriptParser {
           let collected = line; i++;
           while (i < lines.length) {
             collected += '\n' + lines[i];
-            if (lines[i].trimStart() === 'asciiend') { i++; break; }
+            if (/^asciiend/.test(lines[i].trimStart())) { i++; break; }
             i++;
           }
           out.push(collected);
@@ -256,8 +256,13 @@ class StonescriptParser {
         [[T.CONTROL, ':?'], ...this._tokenizeExpr(after)], { value: expr, warnings });
     }
 
-    // : else
-    if (content === ':') return this._block(B.ELSE, indent, content, [[T.CONTROL, ':']]);
+    // : else — also matches '://comment' or ': // comment'
+    if (content === ':' || content.startsWith(': ') || content.startsWith('://') || content.startsWith(':/*')) {
+      const afterColon = content.slice(1).trim();
+      const tokens     = [[T.CONTROL, ':']];
+      if (afterColon) tokens.push(...this._tokenizeExpr(' ' + afterColon));
+      return this._block(B.ELSE, indent, content, tokens);
+    }
 
     // ? condition
     if (content[0] === '?') {
@@ -746,15 +751,22 @@ class StonescriptParser {
   }
 
   // Detect trailing junk in an expression value: multiple words without operator
+  // Skips tokens inside () and [] — those are function args or array elements, not junk.
   // Returns the junk word or null if clean
   _detectExprJunk(val) {
-    const tokens = this._tokenizeExpr(val);
+    const tokens     = this._tokenizeExpr(val);
     const VALUE_TYPES = new Set(['identifier','variable','number','string']);
     let lastType = null;
+    let depth    = 0;
     for (const [type, value] of tokens) {
       if (type === 'space' || type === 'comment') continue;
+      if (type === 'paren'   && value === '(') { depth++; lastType = null; continue; }
+      if (type === 'paren'   && value === ')') { depth = Math.max(0,depth-1); lastType='paren'; continue; }
+      if (type === 'bracket' && value === '[') { depth++; lastType = null; continue; }
+      if (type === 'bracket' && value === ']') { depth = Math.max(0,depth-1); lastType='bracket'; continue; }
+      if (depth > 0) continue; // inside () or [] — skip junk check
       if (VALUE_TYPES.has(type) && VALUE_TYPES.has(lastType)) {
-        return value; // two value-tokens with no operator between them
+        return value;
       }
       lastType = type;
     }
@@ -935,16 +947,22 @@ class StonescriptParser {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       if (i === 0) {
-        // First line: prefix tokens + ascii keyword
-        const m = line.match(/^(\s*)(.*?)\s*(ascii)\s*$/);
+        // First line: everything before 'ascii' keyword + the keyword itself
+        // Capture prefix AND any spaces between prefix and 'ascii'
+        // e.g. 'var ear =  [  ascii' → prefix='var ear =  [', spaces='  ', kw='ascii'
+        const m = line.match(/^(\s*)(.*?)(\s+)(ascii)(\s*)$/);
         if (m) {
-          const pre = m[2] ? this._renderLineAsTokens(m[2].trim()) + ' ' : '';
+          // m[2]=prefix content, m[3]=spaces before ascii, m[4]='ascii', m[5]=trailing
+          const pre = m[2] ? this._renderLineAsTokens(m[2]) + this._esc(m[3]) : this._esc(m[3]);
           out.push(indent + warns + pre + '<span class="keyword">ascii</span>');
         } else {
-          out.push(indent + warns + this._esc(line));
+          // ascii is the whole line (no prefix)
+          out.push(indent + warns + '<span class="keyword">ascii</span>');
         }
-      } else if (line.trim() === 'asciiend') {
-        out.push(indent + '<span class="keyword">asciiend</span>');
+      } else if (/^asciiend/.test(line.trim())) {
+        // asciiend may be followed by ] or other closing chars
+        const after = line.trim().slice('asciiend'.length);
+        out.push(indent + '<span class="keyword">asciiend</span>' + this._esc(after));
       } else {
         out.push(indent + '<span class="string">' + this._esc(line) + '</span>');
       }
