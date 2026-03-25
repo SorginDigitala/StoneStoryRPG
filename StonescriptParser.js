@@ -1049,11 +1049,14 @@ class StonescriptParser {
     if (!expr || !this.condValidate.no_trailing_junk) return [];
     const tokens = this._tokenizeExpr(expr);
     let lastMeaningful = null;
-    let depth = 0;
+    let depth    = 0;
+    let inRHS    = false; // after a comparison op, skip until logical op or end
+    const COMPARISON_OPS = new Set(['=', '!', '<', '>', '<=', '>=']);
+    const LOGICAL_OPS    = new Set(['&', '|']);
     for (const [type, value] of tokens) {
       if (type === 'space' || type === 'comment') continue;
       if (type === 'paren') {
-        if (value === '(') { depth++; lastMeaningful = null; }
+        if (value === '(') { depth++; if (depth === 1) inRHS = false; lastMeaningful = null; }
         else { depth = Math.max(0, depth - 1); if (depth === 0) lastMeaningful = 'paren'; }
         continue;
       }
@@ -1062,18 +1065,26 @@ class StonescriptParser {
         else { depth = Math.max(0, depth - 1); if (depth === 0) lastMeaningful = 'bracket'; }
         continue;
       }
-      if (depth === 0) {
-        // '.' as string is a method access separator — resets junk context
-        if (type === 'string' && value === '.') { lastMeaningful = null; continue; }
-        if ((type === 'identifier' || type === 'variable') &&
-            lastMeaningful &&
-            ['identifier','variable','number','string','paren','bracket'].includes(lastMeaningful)) {
-          return [this._warn(W.BAD_EXPR,
-            `Token inesperado en la condicion: '${value}'. ` +
-            `Falta un operador (= ! < > <= >= & |) antes de este valor.`)];
-        }
-        lastMeaningful = type;
+      if (depth > 0) continue; // inside () or [] — skip
+      // Logical operators end the RHS and reset context
+      if (type === 'operator' && LOGICAL_OPS.has(value)) {
+        inRHS = false; lastMeaningful = 'operator'; continue;
       }
+      // Comparison operators start an RHS — everything after is the value string
+      if (type === 'operator' && COMPARISON_OPS.has(value)) {
+        inRHS = true; lastMeaningful = 'operator'; continue;
+      }
+      if (inRHS) continue; // inside RHS — multi-word values like 'haunted halls' are valid
+      // '.' as string is a method access separator — resets junk context
+      if (type === 'string' && value === '.') { lastMeaningful = null; continue; }
+      if ((type === 'identifier' || type === 'variable') &&
+          lastMeaningful &&
+          ['identifier','variable','number','string','paren','bracket'].includes(lastMeaningful)) {
+        return [this._warn(W.BAD_EXPR,
+          `Token inesperado en la condicion: '${value}'. ` +
+          `Falta un operador (= ! < > <= >= & |) antes de este valor.`)];
+      }
+      lastMeaningful = type;
     }
     return [];
   }
