@@ -72,6 +72,10 @@ var msg = Hello World!
 var greeting = Buenos dias amigo
 var data = test 123 abc
 
+// + es concatenación — permite mezclar literales con variables
+var concat = "hello " + nombre
+var concat2 = "hp: " + hp
+
 
 // ─── 1.4 FUNCIONES DE USUARIO ────────────────────────────
 
@@ -423,17 +427,21 @@ enable player
 
 // ─── 1.12 FUNCIONES NATIVAS ─────────────────────────────
 
-// loc
+// Los nombres NO son case sensitive
 loc.Leave()
+loc.leave()
+loc.LEAVE()
 loc.Pause()
 
 // foe
 var fc = foe.GetCount(10)
+var fc2 = foe.getcount(10)
 
-// item
+// item (case insensitive)
 ?item.CanActivate()
  activate R
 var cd = item.GetCooldown("bardiche")
+var cd2 = item.getcooldown("bardiche")
 var sc = item.GetCount("sword *0 -big")
 var ll = item.GetLoadoutL(1)
 var lr = item.GetLoadoutR(1)
@@ -847,7 +855,31 @@ var pos = 0
 // → error: 'pos' es variable nativa
 
 
-// ─── 2.4 VAR — IMPORT/NEW CON RUTA INVÁLIDA ─────────────
+// ─── 2.4 VAR — NOMBRE DE KEYWORD RESERVADO ──────────────
+
+var var
+// → error: 'var' es palabra reservada del lenguaje
+
+var func
+// → error: 'func' es palabra reservada del lenguaje
+
+var for
+// → error: 'for' es palabra reservada del lenguaje
+
+var return
+// → error: 'return' es palabra reservada del lenguaje
+
+var break
+// → error: 'break' es palabra reservada del lenguaje
+
+var import
+// → error: 'import' es palabra reservada del lenguaje
+
+var continue
+// → error: 'continue' es palabra reservada del lenguaje
+
+
+// ─── 2.5 VAR — IMPORT/NEW CON RUTA INVÁLIDA ─────────────
 
 var loop2 = import funcs/loop aoeu
 // → error: ruta inválida (espacios)
@@ -856,7 +888,83 @@ var obj2 = new bad path/here
 // → error: ruta inválida (espacios)
 
 
-// ─── 2.5 ASIGNACIÓN A VARIABLE NATIVA ───────────────────
+// ─── 2.5b VAR/ASSIGN — VALOR CON JUNK ───────────────────
+
+// Literal string + bare word = error
+var x = "aeuo" aeu
+// → error: no se pueden mezclar literales con palabras sin comillas
+
+// Número + bare word = error
+var x = 2 aoeu
+// → error: no se pueden mezclar literales con palabras sin comillas
+
+// String literal + operador (no +) + bare word = error
+var test = "aoeu" - aeou
+// → error: - no es concatenación, bare word inválido
+
+var test = "hola mundo"=aeou
+// → error: = no tiene sentido en valor de variable
+
+var test = "aoeu" * aeou
+// → error: bare word tras operador con literal
+
+// Pero + es concatenación → válido con bare words si es una variable
+// var test = "aeu" + aoeu  → esto es VÁLIDO (está en sección 1.3)
+
+// Junk dentro de array
+var components = ["oaeu" aoeu]
+// → error: identifier tras string dentro de array
+
+// Falta de coma dentro de array
+var components = ["oaeu" ,oeu "aoeu"]
+// → error: oeu seguido de "aoeu" sin coma
+
+// Falta de coma: identifier tras string entre líneas ^
+var components = ["oaeu" ,oeu
+^ "aoeu"]
+// → error: falta coma (oeu seguido de "aoeu" sin separador)
+
+// Junk en asignación (no solo en var)
+x = "aeuo" aeu
+// → error: identifier tras string en asignación
+
+// Asignación al resultado de una llamada = error
+fc()=aoeu
+// → error: no se puede asignar al resultado de una llamada
+
+// Keyword como valor = error
+var x = var
+// → error: 'var' es palabra reservada
+
+var x = return
+// → error: 'return' es palabra reservada
+
+var x = for
+// → error: 'for' es palabra reservada
+
+var x = break
+// → error: 'break' es palabra reservada
+
+var x = continue
+// → error: 'continue' es palabra reservada
+
+var x = func
+// → error: 'func' es palabra reservada
+
+
+// ─── 2.5c VAR — ARRAY SIN CERRAR ────────────────────────
+
+// Array sin cerrar en una línea
+var components = ["oaeu" ,oeu
+// → error: corchete sin cerrar
+
+// Array sin cerrar con continuación
+var components = ["oaeu" ,oeu,
+^ "aeou"
+// → error: corchete sin cerrar (^ no cierra el array)
+
+
+// ─── 2.6 ASIGNACIÓN A VARIABLE NATIVA ───────────────────
 
 foe = "pallas"
 // → error: variable nativa no asignable
@@ -874,7 +982,7 @@ armor = 10
 // → error: variable nativa no asignable
 
 
-// ─── 2.6 PROPIEDAD SELLADA INEXISTENTE ──────────────────
+// ─── 2.7 PROPIEDAD SELLADA INEXISTENTE ──────────────────
 
 foe.hellow = 2
 // → error: 'foe.hellow' no existe (sealed group)
@@ -952,7 +1060,7 @@ int.Fake()
 // → error: 'int.Fake' no existe
 
 
-// ─── 2.7 NOMBRE DE FUNCIÓN INVÁLIDO ─────────────────────
+// ─── 2.8 NOMBRE DE FUNCIÓN INVÁLIDO ─────────────────────
 
 func 2aa()
  return
@@ -967,7 +1075,7 @@ func test() aeou
 // → error: tokens inesperados tras la firma
 
 
-// ─── 2.8 CONDICIONES — ERRORES DE SINTAXIS ──────────────
+// ─── 2.9 CONDICIONES — ERRORES DE SINTAXIS ──────────────
 
 ?
 // → error: condición vacía
@@ -1024,14 +1132,39 @@ func test() aeou
 ?foe;boss
 // → error: carácter inválido (;)
 
+// Doble comparación sin conector lógico
+?foe = boss = aeou
+ return
+// → error: doble comparación, falta & o |
 
-// ─── 2.9 CONTINUACIÓN — ERRORES ─────────────────────────
+// Condiciones seguidas sin conector
+?item.potion ! empty item.potion = auto
+ return
+// → error: token inesperado, falta & o |
+
+// Operador lógico colgante sin ^ de continuación
+?foe = boss &
+ equip bardiche
+// → error: condición termina con '&' sin operando derecho
+
+?foe = boss |
+ equip bardiche
+// → error: condición termina con '|' sin operando derecho
+
+// Junk tras string entrecomillado en condición
+// NOTA: ?foe = pallas" aoeu → el tokenizer trata " aoeu como un string
+// literal (abre " sin cierre), y queda dentro del RHS tras =.
+// Es un edge case conocido. El caso limpio ?foe = pallas aoeu SÍ da error
+// (detectado por trailing junk).
+
+
+// ─── 2.10 CONTINUACIÓN — ERRORES ─────────────────────────
 
 ^
 // → error: continuación vacía (^ sin contenido)
 
 
-// ─── 2.10 ELSE INVÁLIDO ─────────────────────────────────
+// ─── 2.11 ELSE INVÁLIDO ─────────────────────────────────
 
 : algo aquí
 // → error: contenido inesperado tras ':'
@@ -1040,7 +1173,7 @@ func test() aeou
 // → error: contenido inesperado tras ':'
 
 
-// ─── 2.11 BLOQUES VACÍOS ────────────────────────────────
+// ─── 2.12 BLOQUES VACÍOS ────────────────────────────────
 
 ?true
 
@@ -1054,7 +1187,7 @@ return
 // → error: func vacia() no tiene hijos
 
 
-// ─── 2.12 INDENTACIÓN INCORRECTA ────────────────────────
+// ─── 2.13 INDENTACIÓN INCORRECTA ────────────────────────
 
   loadout 1
 // → error: indentación huérfana (sin padre)
@@ -1065,7 +1198,7 @@ return
 // → error: indentación inconsistente
 
 
-// ─── 2.13 COMANDO / PALABRA NO RECONOCIDA ───────────────
+// ─── 2.14 COMANDO / PALABRA NO RECONOCIDA ───────────────
 
 pepito
 // → error: no es comando ni función reconocida
@@ -1074,7 +1207,7 @@ klkmanin
 // → error: no es comando ni función reconocida
 
 
-// ─── 2.14 VARIABLE NATIVA COMO STATEMENT ────────────────
+// ─── 2.15 VARIABLE NATIVA COMO STATEMENT ────────────────
 
 foe
 // → error: variable nativa usada como statement
@@ -1086,7 +1219,7 @@ loc
 // → error: variable nativa usada como statement
 
 
-// ─── 2.15 TRAILING JUNK EN LLAMADA A FUNCIÓN ────────────
+// ─── 2.16 TRAILING JUNK EN LLAMADA A FUNCIÓN ────────────
 
 func test3()
  return
@@ -1094,13 +1227,13 @@ test3() aoeu
 // → error: token inesperado tras la llamada
 
 
-// ─── 2.16 ASCIIEND SUELTO ───────────────────────────────
+// ─── 2.17 ASCIIEND SUELTO ───────────────────────────────
 
 asciiend
 // → error: asciiend sin bloque ascii previo
 
 
-// ─── 2.17 ASCII FUERA DE CONTEXTO ───────────────────────
+// ─── 2.18 ASCII FUERA DE CONTEXTO ───────────────────────
 
 ascii
 ####
@@ -1108,7 +1241,7 @@ asciiend
 // → error: ascii solo válido como var o print arg
 
 
-// ─── 2.18 VARIABLE NO DECLARADA (warning, no error) ─────
+// ─── 2.19 VARIABLE NO DECLARADA (warning, no error) ─────
 
 ?noExiste > 10
  return
@@ -1118,7 +1251,7 @@ var resultado = otraNoExiste + 1
 // → warning: 'otraNoExiste' no está declarada
 
 
-// ─── 2.19 PROPIEDAD SELLADA EN CONDICIÓN ────────────────
+// ─── 2.20 PROPIEDAD SELLADA EN CONDICIÓN ────────────────
 
 ?foe.test > 0
 // → error: 'foe.test' no existe (sealed)

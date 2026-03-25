@@ -49,6 +49,7 @@ class StonescriptParser {
   constructor(api) {
     this.api        = api;
     this.byId       = {};
+    this.byIdLower  = {};  // case-insensitive lookup: lowercase key → entry
     this.commands   = [];
     this.multiCmds  = [];
     this.keywords   = [];       // lowercase keyword ids
@@ -60,6 +61,7 @@ class StonescriptParser {
 
     // Loaded from __validation__ meta entry
     this.sealedGroups            = new Set();
+    this.sealedGroupsLower       = new Set();
     this.reservedNames           = new Set();
     this.validAbilityIds         = new Set();
     this.continuationStartsWith  = new Set();
@@ -91,6 +93,7 @@ class StonescriptParser {
     const singleCmds = [];
     for (const e of this.api) {
       this.byId[e.id] = e;
+      this.byIdLower[e.id.toLowerCase()] = e;
       switch (e.type) {
         case 'command':
           e.id.includes(' ') ? this.multiCmds.push(e.id) : singleCmds.push(e.id.toLowerCase());
@@ -111,6 +114,7 @@ class StonescriptParser {
         case 'meta':
           if (e.id === '__validation__') {
             this.sealedGroups           = new Set(e.sealed_groups              || []);
+            this.sealedGroupsLower     = new Set((e.sealed_groups || []).map(s => s.toLowerCase()));
             this.reservedNames          = new Set(e.reserved_var_names         || []);
             this.validAbilityIds        = new Set(e.valid_ability_ids          || []);
             this.continuationStartsWith = new Set(e.continuation_must_start_with || []);
@@ -302,8 +306,8 @@ class StonescriptParser {
       if (value === 'true' || value === 'false') continue;
       if (/^[^a-zA-Z_]/.test(value)) continue;
       if (this.keywordSet.has(value.toLowerCase())) continue;
-      if (this.varRoots.includes(value.split('.')[0])) continue;
-      if (this.byId[value]) continue;
+      if (this.varRoots.some(r => r.toLowerCase() === value.split('.')[0].toLowerCase())) continue;
+      if (this.byIdLower[value.toLowerCase()]) continue;
       const def = this._lookupFuncOrVar(value);
       if (def) continue;
       const root = value.split('.')[0];
@@ -481,8 +485,15 @@ class StonescriptParser {
     }
 
     // Print prefixes (longest first)
+    // >f, >o, >h, >c only match as print commands if followed by a digit, minus
+    // (coordinate) or nothing — NOT by a letter (e.g. >found is "> found" not ">f ound")
     for (const pfx of this.printPfx) {
       if (content.startsWith(pfx)) {
+        const afterPfx = content[pfx.length] || '';
+        // Multi-char prefixes like >o, >f, >h, >c need coord-like content after them
+        if (pfx.length > 1 && pfx !== '>(' && pfx !== '>`' && /[a-zA-Z_]/.test(afterPfx)) {
+          continue; // Not a print command — e.g. >found, >okay, >hello
+        }
         const arg = content.slice(pfx.length);
         const tokens = [[T.PRINT, pfx]];
         if (arg) tokens.push([T.STRING, arg]);
@@ -563,7 +574,7 @@ class StonescriptParser {
     if (rest.trimStart().startsWith('(')) return this._parseFuncCall(indent, content, word, rest.trimStart());
     if (/^\s*[+\-*\/]?=/.test(rest) || rest.trimStart().startsWith('++') || rest.trimStart().startsWith('--')) {
       const tokens   = [...this._resolveIdentToken(word), ...this._tokenizeExpr(rest)];
-      const warnings = this._checkAssignment(word);
+      const warnings = [...this._checkAssignment(word), ...this._checkAssignValue(rest)];
       return this._block(B.ASSIGN, indent, content, tokens, { name: word, value: rest.trim(), warnings });
     }
 
@@ -589,7 +600,9 @@ class StonescriptParser {
   }
 
   // Detect junk after a function call: test() aoeu
-  _checkCallTrailingJunk(callStr) {
+  // In conditions, operators like = > < after ) are valid (comparison).
+  // In standalone calls, = after ) means trying to assign to a call result — error.
+  _checkCallTrailingJunk(callStr, isCondition = false) {
     const s = callStr.trimStart();
     if (!s.startsWith('(')) return [];
     let depth = 1, i = 1;
@@ -601,7 +614,15 @@ class StonescriptParser {
     const after = s.slice(i).trim();
     if (!after) return [];
     if (after.startsWith('//') || after.startsWith('/*')) return [];
-    if (/^[=!<>&|+\-*\/%]/.test(after)) return [];
+    // Math operators are always OK (e.g. fc() + 1)
+    if (/^[+\-*\/%]/.test(after)) return [];
+    // Comparison/logical operators only OK inside conditions
+    if (isCondition && /^[=!<>&|]/.test(after)) return [];
+    // Standalone: = after call is assignment to call result — error
+    if (/^[=]/.test(after)) {
+      return [this._warn(W.BAD_EXPR,
+        `No se puede asignar al resultado de una llamada a funcion.`)];
+    }
     return [this._warn(W.BAD_EXPR,
       `Token inesperado tras la llamada: '${after}'.`)];
   }
@@ -645,6 +666,121 @@ class StonescriptParser {
         blocks[f.blockIdx].warnings.push(
           this._warn(W.EMPTY_BLOCK, 'El bloque esta vacio (no hay lineas con mayor indentacion)'));
     }
+    // FIX: Check for dangling & or | at end of conditions/elseifs
+    // Only error if the NEXT non-trivial block is NOT a ^ continuation
+    for (let bi = 0; bi < n; bi++) {
+      const b = blocks[bi];
+      if (b.type !== B.CONDITION && b.type !== B.ELSEIF) continue;
+      if (!b.value) continue;
+      // Check if expression ends with & or |
+      const exprTokens = this._tokenizeExpr(b.value);
+      let lastOp = null;
+      for (const [t, v] of exprTokens) {
+        if (t === 'space' || t === 'comment') continue;
+        if (t === 'operator' && this.logicalOps.has(v)) lastOp = v;
+        else lastOp = null;
+      }
+      if (!lastOp) continue;
+      // Look ahead: is the next block a ^ continuation?
+      let hasContinuation = false;
+      for (let j = bi + 1; j < n; j++) {
+        if (blocks[j].type === B.EMPTY || blocks[j].type === B.COMMENT) continue;
+        if (blocks[j].type === B.CONTINUE) hasContinuation = true;
+        break;
+      }
+      if (!hasContinuation) {
+        b.warnings.push(this._warn(W.BAD_EXPR,
+          `La condicion termina con '${lastOp}' sin operando derecho. ` +
+          `Añade una condicion tras '${lastOp}' o usa ^ para continuar en la siguiente linea.`));
+      }
+    }
+
+    // FIX: Check for unclosed brackets in var/assign blocks.
+    // Concatenate the block's raw content with all following ^ continuation blocks.
+    // If brackets are still unclosed after all continuations, it's an error.
+    for (let bi = 0; bi < n; bi++) {
+      const b = blocks[bi];
+      if (b.type !== B.KEYWORD && b.type !== B.ASSIGN) continue;
+      if (b.type === B.KEYWORD && b.name !== 'var') continue;
+      // Gather all raw content: this block + following ^ continuations + trailing ] or )
+      let fullExpr = b.raw || '';
+      for (let j = bi + 1; j < n; j++) {
+        if (blocks[j].type === B.EMPTY || blocks[j].type === B.COMMENT) continue;
+        if (blocks[j].type === B.CONTINUE) {
+          fullExpr += '\n' + (blocks[j].raw || '');
+          continue;
+        }
+        // A raw block that is just ] or ) closes the bracket — include it
+        const rawTr = (blocks[j].raw || '').trim();
+        if (blocks[j].type === B.RAW && /^[\]\)]+$/.test(rawTr)) {
+          fullExpr += '\n' + (blocks[j].raw || '');
+          continue;
+        }
+        break; // non-continuation block — stop
+      }
+      // Count bracket depth across the full expression, skipping string contents
+      let bracketDepth = 0, parenDepth = 0;
+      let inStr = false, strCh = '';
+      for (let ci = 0; ci < fullExpr.length; ci++) {
+        const ch = fullExpr[ci];
+        if (inStr) {
+          if (ch === strCh) inStr = false;
+          continue;
+        }
+        if (ch === '"' || ch === "'") { inStr = true; strCh = ch; continue; }
+        if (ch === '[') bracketDepth++;
+        else if (ch === ']') bracketDepth--;
+        else if (ch === '(') parenDepth++;
+        else if (ch === ')') parenDepth--;
+      }
+      if (bracketDepth > 0) {
+        b.warnings.push(this._warn(W.BAD_VAR,
+          `Corchete '[' sin cerrar. Falta ']' al final de la expresion.`));
+      }
+      if (parenDepth > 0) {
+        b.warnings.push(this._warn(W.BAD_EXPR,
+          `Parentesis '(' sin cerrar. Falta ')' al final de la expresion.`));
+      }
+    }
+
+    // FIX: Check for junk in ^ continuation lines of var/assign blocks.
+    // Concatenate all ^ lines and run junk detection on the combined value.
+    for (let bi = 0; bi < n; bi++) {
+      const b = blocks[bi];
+      if (b.type !== B.KEYWORD && b.type !== B.ASSIGN) continue;
+      if (b.type === B.KEYWORD && b.name !== 'var') continue;
+      // Get the value portion
+      let valExpr = '';
+      if (b.type === B.KEYWORD && b.name === 'var' && b.value) {
+        const eqIdx = b.value.indexOf('=');
+        valExpr = eqIdx >= 0 ? b.value.slice(eqIdx + 1).trim() : '';
+      } else if (b.type === B.ASSIGN && b.value) {
+        const m = b.value.match(/^[+\-*\/]?=\s*(.*)/s);
+        valExpr = m ? m[1] : '';
+      }
+      // Append ^ continuation content and trailing ] blocks
+      for (let j = bi + 1; j < n; j++) {
+        if (blocks[j].type === B.EMPTY || blocks[j].type === B.COMMENT) continue;
+        if (blocks[j].type === B.CONTINUE) {
+          const contContent = (blocks[j].raw || '').replace(/^\^/, '').trim();
+          valExpr += ' ' + contContent;
+          continue;
+        }
+        const rawTr = (blocks[j].raw || '').trim();
+        if (blocks[j].type === B.RAW && /^[\]\)]+$/.test(rawTr)) {
+          valExpr += ' ' + rawTr;
+          continue;
+        }
+        break;
+      }
+      if (!valExpr.trim()) continue;
+      // Run junk detection on the full combined value
+      const junkWarn = this._detectValueJunk(valExpr);
+      if (junkWarn && !b.warnings.some(w => w.type === junkWarn.type)) {
+        b.warnings.push(junkWarn);
+      }
+    }
+
     return this._resolveTree(blocks);
   }
 
@@ -767,7 +903,8 @@ class StonescriptParser {
       inner += ch; i++;
     }
     if (inner !== '') tokens.push(...this._tokenizeExpr(inner));
-    tokens.push([T.PAREN, ')']);
+    // FIX: Only add ')' if paren was actually closed in the source
+    if (depth === 0) tokens.push([T.PAREN, ')']);
     const after = s.slice(i);
     if (after.trim() !== '') tokens.push(...this._tokenizeExpr(after));
     return tokens;
@@ -804,14 +941,16 @@ class StonescriptParser {
   _resolveIdentToken(word) {
     const def = this._lookupFuncOrVar(word);
     if (def) return [[(def.type === 'func' ? T.FUNCTION : T.VARIABLE), word]];
-    const root = word.split('.')[0];
-    if (this.varRoots.includes(root)) return [[T.VARIABLE, word]];
+    const root = word.split('.')[0].toLowerCase();
+    if (this.varRoots.some(r => r.toLowerCase() === root)) return [[T.VARIABLE, word]];
     return [[T.IDENTIFIER, word]];
   }
   _lookupFuncOrVar(name) {
-    if (this.byId[name]) return this.byId[name];
-    const bare = name.replace(/\(.*$/s, '');
-    if (this.byId[bare]) return this.byId[bare];
+    // Case-insensitive lookup: Stonescript names are not case-sensitive
+    const lc = name.toLowerCase();
+    if (this.byIdLower[lc]) return this.byIdLower[lc];
+    const bare = lc.replace(/\(.*$/s, '');
+    if (this.byIdLower[bare]) return this.byIdLower[bare];
     return null;
   }
   _lookupCommand(name) {
@@ -915,13 +1054,13 @@ class StonescriptParser {
 
   _checkSealedProp(name) {
     if (!name.includes('.')) return [];
-    const root = name.split('.')[0];
-    if (!this.sealedGroups.has(root)) return [];
-    if (this.byId[name]) return [];
-    const bare = name.replace(/\(.*$/s, '');
-    if (this.byId[bare]) return [];
-    const known = this.api.some(e => (e.type === 'var' || e.type === 'func') && e.id === name);
-    if (known) return [];
+    const root = name.split('.')[0].toLowerCase();
+    if (!this.sealedGroupsLower.has(root)) return [];
+    // Case-insensitive lookup
+    const lc = name.toLowerCase();
+    if (this.byIdLower[lc]) return [];
+    const bare = lc.replace(/\(.*$/s, '');
+    if (this.byIdLower[bare]) return [];
     return [this._warn(W.SEALED_PROP,
       `'${name}' no existe. '${root}' es una variable nativa sellada — ` +
       `sus propiedades estan fijadas por el juego.`)];
@@ -973,6 +1112,11 @@ class StonescriptParser {
       return [this._warn(W.BAD_VAR,
         `'${name}' es una variable nativa del juego y no puede usarse como nombre de variable.`)];
 
+    // FIX: Also block language keywords as variable names
+    if (this.keywordSet.has(name.toLowerCase()))
+      return [this._warn(W.BAD_VAR,
+        `'${name}' es una palabra reservada del lenguaje y no puede usarse como nombre de variable.`)];
+
     // FIX: Handle both 'var x = import path' and 'var x = new path'
     // Both create opaque references — validate only the path.
     if (valPart) {
@@ -981,30 +1125,112 @@ class StonescriptParser {
         return this._checkImport(importOrNew[2]);
       }
     }
-    // FIX: Removed _detectExprJunk check.
-    // In Stonescript, var values are always valid — unquoted text is treated as a string.
-    // e.g. 'var message = Hello World!' assigns the string "Hello World!" to message.
+
+    // FIX: Validate var values — detect invalid mixed types.
+    // Rules:
+    //   var x = aoeu aoeu       → valid (implicit multi-word string)
+    //   var x = "aeuo" aeu      → error (quoted string + bare word)
+    //   var x = 2 aoeu          → error (number + bare word)
+    //   var x = [...]           → valid (array) — but unclosed [ is error
+    if (this.varValidate.no_junk_after_value && valPart) {
+      const junkWarn = this._detectValueJunk(valPart);
+      if (junkWarn) return [junkWarn];
+    }
 
     return [];
   }
 
-  _detectExprJunk(val) {
-    const tokens     = this._tokenizeExpr(val);
-    const VALUE_TYPES = new Set(['identifier','variable','number','string']);
+  // Detect invalid mixed types in a value expression.
+  // Rules:
+  //   identifier identifier  → valid (implicit multi-word string: Hello World)
+  //   "string" + identifier  → valid (+ is concatenation)
+  //   "string" - identifier  → error (- is not concatenation)
+  //   "string" = identifier  → error (= makes no sense in value)
+  //   keyword as value       → error (var x = var)
+  //   identifier "string"    → error (missing comma)
+  //   identifier number      → error (missing comma)
+  // Inside arrays the same rules apply between commas.
+  _detectValueJunk(val) {
+    const tokens = this._tokenizeExpr(val);
+    let depth = 0;
     let lastType = null;
-    let depth    = 0;
+    let lastValue = null;
+    let seenLiteral = false;
+    let lastOperator = null;
+
     for (const [type, value] of tokens) {
       if (type === 'space' || type === 'comment') continue;
-      if (type === 'paren'   && value === '(') { depth++; lastType = null; continue; }
-      if (type === 'paren'   && value === ')') { depth = Math.max(0,depth-1); lastType='paren'; continue; }
-      if (type === 'bracket' && value === '[') { depth++; lastType = null; continue; }
-      if (type === 'bracket' && value === ']') { depth = Math.max(0,depth-1); lastType='bracket'; continue; }
-      if (depth > 0) continue;
-      if (VALUE_TYPES.has(type) && VALUE_TYPES.has(lastType)) {
-        return value;
+      if (type === 'paren' && value === '(')   { depth++; lastType = null; continue; }
+      if (type === 'paren' && value === ')')   { depth = Math.max(0, depth - 1); lastType = 'paren'; continue; }
+      if (type === 'bracket' && value === '[') { depth++; lastType = null; seenLiteral = false; continue; }
+      if (type === 'bracket' && value === ']') { depth = Math.max(0, depth - 1); lastType = 'bracket'; seenLiteral = false; continue; }
+
+      // Commas reset the segment context
+      if (type === 'string' && value === ',') {
+        lastType = 'comma'; lastValue = value; seenLiteral = false; lastOperator = null; continue;
       }
+
+      // Track operators (for + concatenation check)
+      if (type === 'operator') {
+        lastType = 'operator'; lastValue = value; lastOperator = value; continue;
+      }
+
+      // Detect keywords used as values (var x = var, var x = return, etc.)
+      // Check the value string against keywordSet regardless of token type,
+      // because keywords may tokenize as T.VARIABLE or T.IDENTIFIER
+      if (depth === 0 && this.keywordSet.has((value || '').toLowerCase()) &&
+          !['import', 'new'].includes((value || '').toLowerCase())) {
+        return this._warn(W.BAD_EXPR,
+          `'${value}' es una palabra reservada del lenguaje y no puede usarse como valor.`);
+      }
+
+      // Track if we've seen a literal in this segment
+      if (type === 'string' && /^["']/.test(value)) seenLiteral = true;
+      if (type === 'number') seenLiteral = true;
+
+      // After seeing a literal: bare identifiers are junk UNLESS preceded by +
+      // (+ is string concatenation in Stonescript)
+      if (seenLiteral && (type === 'identifier' || type === 'variable')) {
+        if (lastOperator === '+') {
+          lastType = type; lastValue = value; lastOperator = null; continue;
+        }
+        // Known native vars/funcs in expressions are OK (e.g. 1 * foe.hp)
+        const lcVal = (value || '').toLowerCase();
+        const isKnown = this.byIdLower[lcVal] || this._lookupFuncOrVar(value) ||
+                         this.varRoots.some(r => r.toLowerCase() === lcVal.split('.')[0]);
+        if (!isKnown) {
+          return this._warn(W.BAD_EXPR,
+            `Token inesperado: '${value}'. ` +
+            `No se pueden mezclar literales con palabras sin comillas.`);
+        }
+      }
+
+      // After a quoted string: another quoted string without comma is junk
+      if (type === 'string' && /^["']/.test(value) && lastType === 'string') {
+        return this._warn(W.BAD_EXPR,
+          `String literal ${value} inesperado tras otro string. ` +
+          `Falta una coma entre los valores.`);
+      }
+
+      // After an identifier: a quoted string or number without operator/comma is junk
+      if (lastType === 'identifier' || lastType === 'variable') {
+        if (type === 'string' && /^["']/.test(value)) {
+          return this._warn(W.BAD_EXPR,
+            `String literal ${value} inesperado tras '${lastValue}'. ` +
+            `Falta una coma o un operador.`);
+        }
+        if (type === 'number') {
+          return this._warn(W.BAD_EXPR,
+            `Numero '${value}' inesperado tras '${lastValue}'. ` +
+            `Falta una coma o un operador.`);
+        }
+      }
+
       lastType = type;
+      lastValue = value;
+      lastOperator = null;
     }
+
     return null;
   }
 
@@ -1058,7 +1284,22 @@ class StonescriptParser {
     if (this.nonAssignableRoots.has(root))
       return [this._warn(W.BAD_STATEMENT,
         `'${name}' es una variable nativa y no puede ser asignada.`)];
-    return this._checkSealedProp(name);
+    const sealedWarns = this._checkSealedProp(name);
+    if (sealedWarns.length) return sealedWarns;
+    return [];
+  }
+
+  // Called from _parseWordLine for ASSIGN blocks to validate the RHS value
+  _checkAssignValue(rest) {
+    // rest is like " = value" or " += value" — extract the value part
+    const m = rest.match(/^\s*[+\-*\/]?=\s*(.*)/s);
+    if (!m) return [];
+    const valPart = m[1].trim();
+    if (!valPart) return [];
+    // Apply the same junk detection as var values
+    const junkWarn = this._detectValueJunk(valPart);
+    if (junkWarn) return [junkWarn];
+    return [];
   }
 
   _checkCondTrailingJunk(expr) {
@@ -1066,39 +1307,79 @@ class StonescriptParser {
     const tokens = this._tokenizeExpr(expr);
     let lastMeaningful = null;
     let depth    = 0;
-    let inRHS    = false;
+    let inRHS    = false;   // after a comparison op, consuming the RHS value
+    let rhsHasValue = false; // whether we've seen at least one value token in RHS
     const COMPARISON_OPS = this.comparisonOps;
     const LOGICAL_OPS    = this.logicalOps;
+    let lastOperator = null;
+
     for (const [type, value] of tokens) {
       if (type === 'space' || type === 'comment') continue;
       if (type === 'paren') {
-        if (value === '(') { depth++; if (depth === 1) inRHS = false; lastMeaningful = null; }
+        if (value === '(') { depth++; lastMeaningful = null; }
         else { depth = Math.max(0, depth - 1); if (depth === 0) lastMeaningful = 'paren'; }
+        lastOperator = null;
         continue;
       }
       if (type === 'bracket') {
         if (value === '[') { depth++; lastMeaningful = null; }
         else { depth = Math.max(0, depth - 1); if (depth === 0) lastMeaningful = 'bracket'; }
+        lastOperator = null;
         continue;
       }
       if (depth > 0) continue;
+
+      // Logical operators reset RHS context — this is the correct separator
       if (type === 'operator' && LOGICAL_OPS.has(value)) {
-        inRHS = false; lastMeaningful = 'operator'; continue;
+        inRHS = false; rhsHasValue = false;
+        lastMeaningful = 'operator'; lastOperator = value;
+        continue;
       }
+
+      // FIX: Comparison op while already in RHS = double comparison without & or |
+      // e.g. ?foe = boss = aeou → two comparisons not separated by & or |
       if (type === 'operator' && COMPARISON_OPS.has(value)) {
-        inRHS = true; lastMeaningful = 'operator'; continue;
+        if (inRHS && rhsHasValue) {
+          return [this._warn(W.BAD_EXPR,
+            `Doble comparacion: '${value}' aparece tras un valor de comparacion. ` +
+            `Usa '&' o '|' para separar condiciones.`)];
+        }
+        inRHS = true; rhsHasValue = false;
+        lastMeaningful = 'operator'; lastOperator = value;
+        continue;
       }
-      if (inRHS) continue;
-      if (type === 'string' && value === '.') { lastMeaningful = null; continue; }
+
+      // Inside RHS — consuming the value after a comparison operator
+      if (inRHS) {
+        rhsHasValue = true;
+        lastOperator = null;
+        continue;
+      }
+
+      // LHS context — check for junk
+      if (type === 'string' && value === '.') { lastMeaningful = null; lastOperator = null; continue; }
+
+      // Identifier/variable after a string literal = junk
+      if ((type === 'identifier' || type === 'variable') && lastMeaningful === 'string') {
+        return [this._warn(W.BAD_EXPR,
+          `Token inesperado en la condicion: '${value}'. ` +
+          `Falta un operador (= ! < > <= >= & |) antes de este valor.`)];
+      }
+
+      // Two consecutive value tokens without operator = junk
       if ((type === 'identifier' || type === 'variable') &&
           lastMeaningful &&
-          ['identifier','variable','number','string','paren','bracket'].includes(lastMeaningful)) {
+          ['identifier','variable','number','paren','bracket'].includes(lastMeaningful)) {
         return [this._warn(W.BAD_EXPR,
           `Token inesperado en la condicion: '${value}'. ` +
           `Falta un operador (= ! < > <= >= & |) antes de este valor.`)];
       }
       lastMeaningful = type;
+      lastOperator = null;
     }
+
+    // Note: dangling & or | at end is checked in _buildTree (needs ^ context)
+
     return [];
   }
 

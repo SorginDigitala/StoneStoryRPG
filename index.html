@@ -423,8 +423,21 @@ function triggerAC() {
   let pool = acData;
 
   if (dotCtx) {
+    // Detect the receiver before the dot: walk back past the dot, then grab word chars
+    const v2 = inputEl.value;
+    let rs = wStart - 2; // skip the '.'
+    while (rs >= 0 && /[a-zA-Z0-9_.]/.test(v2[rs])) rs--;
+    rs++;
+    const receiver = v2.slice(rs, wStart - 1); // e.g. "foe" from "foe."
+
     if (receiverIsArray) {
       pool = acData.filter(e => e.id.startsWith('array.') && !e.id.includes('['));
+    } else if (receiver) {
+      // Filter to entries that start with "receiver." (e.g. "foe." → foe.*)
+      const prefix = receiver + '.';
+      pool = acData.filter(e => e.id.startsWith(prefix));
+      // Fallback: if no matches for this specific receiver, show all dotted entries
+      if (!pool.length) pool = acData.filter(e => e.id.includes('.'));
     } else {
       pool = acData.filter(e => e.id.includes('.'));
     }
