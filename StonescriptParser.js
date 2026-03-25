@@ -194,7 +194,7 @@ class StonescriptParser {
           if (nameMatch) {
             const name    = nameMatch[1];
             const valPart = b.value.trim().slice(name.length).replace(/^\s*=\s*/, '');
-            if (/^import\s/.test(valPart.trim())) importRoots.add(name);
+            if (/^(import|new)\s/.test(valPart.trim())) importRoots.add(name);
             else declared.add(name);
           }
         }
@@ -705,8 +705,21 @@ class StonescriptParser {
       if (/[a-zA-Z_]/.test(c)) {
         const wm = rest.match(/^[a-zA-Z_][a-zA-Z0-9_.]*/), word = wm[0];
         pos += word.length;
-        // 'import' in an expression (e.g. var x = import Path) → keyword (blue)
-        if (word.toLowerCase() === 'import') { tokens.push([T.KEYWORD, word]); continue; }
+        // 'import' or 'new' in an expression (e.g. var x = import Path, array element)
+        // → keyword (blue) + path as STRING token (so scope analysis skips it)
+        if (word.toLowerCase() === 'import' || word.toLowerCase() === 'new') {
+          tokens.push([T.KEYWORD, word]);
+          // Consume optional whitespace then the path (letters, digits, _, ., -, /)
+          let pathStart = pos;
+          while (pos < expr.length && (expr[pos] === ' ' || expr[pos] === '\t')) pos++;
+          if (pathStart < pos) tokens.push([T.SPACE, expr.slice(pathStart, pos)]);
+          const pathMatch = expr.slice(pos).match(/^[a-zA-Z0-9_.\-]+(?:\/[a-zA-Z0-9_.\-]+)*/);
+          if (pathMatch) {
+            tokens.push([T.STRING, pathMatch[0]]);
+            pos += pathMatch[0].length;
+          }
+          continue;
+        }
         if (pos < expr.length && expr[pos] === '(') {
           // Try direct lookup, then 'array.X' if previous meaningful token was ']'.'
           let def = this._lookupFuncOrVar(word);
@@ -841,16 +854,32 @@ class StonescriptParser {
       }
     }
 
-    if (this.condValidate.no_bare_string) {
-      if (/[a-zA-Z0-9_]\s+"/.test(expr) || /[a-zA-Z0-9_]\s+'/.test(expr))
-        warns.push(this._warn(W.BAD_EXPR,
-          `String literal sin operador. Usa un operador de comparacion: = ! < > <= >=`));
-    }
+    // no_bare_string: only flag UNQUOTED bare words (e.g. ?foe skeleton)
+    // Quoted strings like ?foe "skeleton" are valid — the intent is clear.
+    // Unquoted multi-word is already caught by _checkCondTrailingJunk.
 
+    // FIX: Sealed property check should skip dotted words in the RHS of comparisons.
+    // After '=' or '!', everything until the next '&' or '|' is a string value.
+    // e.g. ?foe.time=foe.totaltime → 'foe.totaltime' is the RHS string, not a property access.
     const dottedWords = expr.match(/\b[a-zA-Z_][a-zA-Z0-9_.]*\b/g) || [];
-    for (const dw of dottedWords) {
-      if (!dw.includes('.')) continue;
-      warns.push(...this._checkSealedProp(dw));
+    if (dottedWords.length) {
+      // Build a set of RHS regions to skip
+      const rhsWords = new Set();
+      const tokens = this._tokenizeExpr(expr);
+      let inRHS = false;
+      for (const [type, value] of tokens) {
+        if (type === 'space' || type === 'comment') continue;
+        if (type === 'operator' && this.comparisonOps.has(value)) { inRHS = true; continue; }
+        if (type === 'operator' && this.logicalOps.has(value)) { inRHS = false; continue; }
+        if (inRHS && (type === 'identifier' || type === 'variable')) {
+          rhsWords.add(value);
+        }
+      }
+      for (const dw of dottedWords) {
+        if (!dw.includes('.')) continue;
+        if (rhsWords.has(dw)) continue; // Skip: this word is in a RHS string context
+        warns.push(...this._checkSealedProp(dw));
+      }
     }
 
     warns.push(...this._checkCondTrailingJunk(expr));
@@ -861,13 +890,12 @@ class StonescriptParser {
     return warns;
   }
 
+  // FIX: ^ just means "this line continues the previous one".
+  // Any content is valid after ^. Only error if completely empty.
   _checkContinuation(rest) {
-    if (!rest || !this.continuationStartsWith.size) return [];
-    if ([...this.continuationStartsWith].some(s => rest.startsWith(s))) return [];
-    return [this._warn(W.BAD_CONTINUE,
-      `Una linea de continuacion ^ debe empezar con & o | (conector logico) ` +
-      `o con ( o . (continuacion de expresion). ` +
-      `Se encontro: '${rest.slice(0, 10)}'`)];
+    if (!rest) return [this._warn(W.BAD_CONTINUE,
+      `La linea de continuacion ^ esta vacia.`)];
+    return [];
   }
 
   _checkBareWord(word, rest) {
@@ -902,7 +930,8 @@ class StonescriptParser {
   _checkImport(path) {
     const commentIdx = path.indexOf('//');
     const stripped   = (commentIdx >= 0 ? path.slice(0, commentIdx) : path).trim();
-    if (!stripped) return [];
+    // FIX: Empty path is an error
+    if (!stripped) return [this._warn(W.BAD_IMPORT, `Se requiere una ruta de archivo.`)];
     if (this.importValidate.no_spaces && /\s/.test(stripped))
       return [this._warn(W.BAD_IMPORT,
         `La ruta '${stripped}' no puede contener espacios.`)];
@@ -918,7 +947,8 @@ class StonescriptParser {
 
   _checkVarDecl(arg) {
     const trimmed = arg.trim();
-    if (!trimmed) return [];
+    // FIX: Empty var declaration is an error
+    if (!trimmed) return [this._warn(W.BAD_VAR, `Se requiere un nombre de variable.`)];
 
     const eqIdx  = trimmed.indexOf('=');
     const namePart = (eqIdx >= 0 ? trimmed.slice(0, eqIdx) : trimmed).trim();
@@ -943,17 +973,17 @@ class StonescriptParser {
       return [this._warn(W.BAD_VAR,
         `'${name}' es una variable nativa del juego y no puede usarse como nombre de variable.`)];
 
-    if (this.varValidate.no_junk_after_value && valPart) {
-      if (/^import\s/.test(valPart.trim())) {
-        const pathMatch = valPart.trim().match(/^import\s+(.*)/);
-        if (pathMatch) return this._checkImport(pathMatch[1]);
-        return [];
+    // FIX: Handle both 'var x = import path' and 'var x = new path'
+    // Both create opaque references — validate only the path.
+    if (valPart) {
+      const importOrNew = valPart.trim().match(/^(import|new)\s+(.*)/);
+      if (importOrNew) {
+        return this._checkImport(importOrNew[2]);
       }
-      const junk = this._detectExprJunk(valPart);
-      if (junk) return [this._warn(W.BAD_VAR,
-        `Valor de variable invalido: '${valPart}'. ` +
-        `Token inesperado: '${junk}'. Si es una cadena, usa comillas: var ${name} = "${valPart}"`)];
     }
+    // FIX: Removed _detectExprJunk check.
+    // In Stonescript, var values are always valid — unquoted text is treated as a string.
+    // e.g. 'var message = Hello World!' assigns the string "Hello World!" to message.
 
     return [];
   }

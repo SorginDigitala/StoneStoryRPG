@@ -1,0 +1,1130 @@
+// ╔══════════════════════════════════════════════════════╗
+// ║  PARTE 1: CÓDIGO VÁLIDO (sin errores ni warnings)   ║
+// ╚══════════════════════════════════════════════════════╝
+
+
+// ─── 1.1 COMENTARIOS ─────────────────────────────────────
+
+// Comentario de línea
+// Otro comentario
+  // Comentario indentado (los comentarios ignoran la indentación)
+
+/* Comentario de bloque en una sola línea */
+
+/*
+Comentario de bloque
+multilínea
+*/
+
+// Truco: comentario condicional (válido — // convierte /* en texto)
+// /*
+activate voidweaver
+/*/
+activate p
+//*/
+
+
+// ─── 1.2 IMPORTS ─────────────────────────────────────────
+
+import Fishing
+import UI/MindstoneButton
+import UI/BetterInfo2
+import MyCombatScript
+import valido//esto es un comentario pegado
+import    test
+import test
+import some.file
+import my-script
+import deep/nested/path/to/file
+
+
+// ─── 1.3 VARIABLES ──────────────────────────────────────
+
+var valida
+var test = "hola mundo"
+var   f = foe
+var i = 0
+var i2 = 1 + i - 10
+var message = Hello World!
+var _private = 42
+var camelCase = true
+var snake_case = false
+var x = 2 * (3 - 1)
+var a = 2 + 3
+var bval = 2 * 0.4
+var c = 8
+c = c / 4
+var d = 5 % 4
+var e = 3
+e++
+e--
+
+// var con import (referencia opaca)
+var loop = import funcs/loop
+var utils = import UI/Utils
+
+// var con new (referencia opaca, como import)
+var v = new Components/Vector
+var obj = new UI/MyWidget
+
+// var con valor multi-palabra (string implícito sin comillas)
+var msg = Hello World!
+var greeting = Buenos dias amigo
+var data = test 123 abc
+
+
+// ─── 1.4 FUNCIONES DE USUARIO ────────────────────────────
+
+func MyFunc()
+ return
+
+func MyFunc2(param)
+ return param
+
+func Add(a, b)
+ return a + b
+
+func _private_func()
+ return true
+
+func Shield(s)
+ ?item.GetCooldown(s) <= 0 & foe.distance > 10 & foe.distance < 17
+  equipR @s@
+  equipL trisk
+  return true
+ return false
+
+
+// ─── 1.5 LLAMADAS A FUNCIONES ────────────────────────────
+
+MyFunc()
+MyFunc2(42)
+Add(1, 2)
+Shield("bash")
+
+
+// ─── 1.6 CONDICIONES ────────────────────────────────────
+
+?true
+ return true
+
+?loc = caves
+ loadout 1
+
+? foe = "pallas"
+ return true
+
+?foe = pallas
+ return true
+
+// Condición con string entrecomillado sin operador (comparación implícita)
+?foe "skeleton"
+ return true
+
+?hp < 6
+ activate potion
+
+?hp = maxhp
+ loadout 2
+
+?foe ! poison
+ equipL sword
+
+?loc = caves & foe = boss
+ loadout 3
+
+?foe = slow | foe.count > 3
+ activate potion
+
+?foe.count > 10
+ equip shiny bardiche
+
+?loc.stars >= 6
+ equipR vigor shield
+
+?hp <= 6
+ activate potion
+
+? !ai.enabled
+ >The AI is not enabled.
+
+?hp < maxhp - 5
+ equip vigor sword dL
+
+// Condición con RHS multi-palabra (haunted halls es el string)
+?loc = haunted halls
+ loadout 1
+
+// Condición booleana (sin operador)
+?loc.begin
+ loadout 1
+
+?loc.loop
+ loadout 2
+
+?loc.isQuest
+ >`0,1,We're in a special quest location
+
+?encounter.isElite
+ >`0,1,Elite encounter!
+
+
+// ─── 1.7 IF / ELSEIF / ELSE ─────────────────────────────
+
+?loc = caves
+ loadout 1
+:?loc = deadwood
+ loadout 2
+:
+ loadout 3
+
+// Else con comentario pegado
+?loc = caves
+ loadout 1
+:// esto es válido
+ loadout 2
+
+// Else con comentario de bloque
+?loc = caves
+ loadout 1
+: /* también válido */
+ loadout 2
+
+// Else con comentario separado por espacio
+?loc = caves
+ loadout 1
+: // esto también vale
+ loadout 2
+
+
+// ─── 1.8 CONTINUACIÓN DE LÍNEA (^) ──────────────────────
+
+// ^ con conector lógico al inicio (forma clásica)
+?foe = pallas
+^ & foe.time > 0
+ return true
+
+?hp < maxhp
+^ | armor < maxarmor
+ activate potion
+
+// ^ con conector lógico al FINAL de la línea anterior
+?foe = pallas &
+^ foe.time > 0
+ return true
+
+// ^ con operador de comparación
+?foe
+^=boss
+ equip bardiche
+
+// ^ en llamada de función multilínea
+var result = string.Format(
+^  "My name is {0} and I have {1} power!",
+^  player.name,
+^  totalgp
+^)
+
+
+// ─── 1.9 BUCLES FOR ─────────────────────────────────────
+
+// Rango
+for i = 1..5
+ >`0,@i@,i = @i@
+
+// Iteración sobre array
+var a = [1, 2, 3]
+for value : a
+ >@value@
+
+// Con break y continue
+for i = 1..5
+ ?i = 3
+  break
+
+for i = 1..5
+ ?i = 3
+  continue
+ >`0,@i@,@i@
+
+
+// ─── 1.10 COMANDOS ──────────────────────────────────────
+
+// equip
+equip vigor crossbow *8 +5
+equipL poison d_sword
+equipR vigor shield
+
+// loadout
+loadout 1
+loadout 2
+
+// activate (fijos)
+activate R
+activate L
+activate p
+activate potion
+activate left
+activate right
+
+// activate (ability IDs conocidos)
+activate bardiche
+activate bash
+activate blade
+activate cinderwisp
+activate compound
+activate dash
+activate hatchet
+activate heavy_hammer
+activate lollipop_wand
+activate mask
+activate mind
+activate quarterstaff
+activate shovel
+activate skeleton_arm
+activate staff_aether
+activate staff_fire
+activate staff_ice
+activate staff_poison
+activate staff_stone
+activate staff_vigor
+activate talisman_aether
+activate talisman_fire
+activate voidweaver
+activate wand_aether
+activate wand_fire
+activate wand_ice
+activate wand_poison
+activate wand_stone
+activate wand_vigor
+
+// brew
+?loc.begin
+ brew bronze + tar
+brew tar
+
+// play
+play buy
+play buy 200
+
+// print
+>Hello World!
+>o-6,3,#red,Let's go!
+>`0,1,#red,Score = @totalgp@
+>c0,0,Hello World!
+>( OwO
+
+// disable / enable
+disable hud
+disable hud ru
+enable hud
+disable abilities
+enable abilities
+disable banner
+enable banner
+disable loadout input
+enable loadout input
+disable loadout print
+enable loadout print
+disable npcDialog
+enable npcDialog
+disable pause
+enable pause
+disable player
+enable player
+
+
+// ─── 1.11 VARIABLES NATIVAS ─────────────────────────────
+
+// loc
+>`0,1,@loc@
+>`0,2,@loc.id@
+>`0,3,@loc.name@
+>`0,4,Stars: @loc.stars@
+>`0,5,GP: @loc.gp@
+>`0,6,Avg: @loc.averageTime@
+>`0,7,Best: @loc.bestTime@
+
+// foe
+>`0,1,@foe@
+>`0,2,@foe.id@
+>`0,3,@foe.name@
+>`0,4,dmg=@foe.damage@
+>`0,5,dist=@foe.distance@
+>`0,6,hp=@foe.hp@/@foe.maxhp@
+>`0,7,armor=@foe.armor@/@foe.maxarmor@
+>`0,8,state=@foe.state@
+>`0,9,time=@foe.time@
+>`0,10,lvl=@foe.level@
+>`0,11,z=@foe.z@
+>`0,12,count=@foe.count@
+
+// player
+>`0,1,hp=@hp@/@maxhp@
+>`0,2,armor=@armor@/@maxarmor@
+>`0,3,armor.f=@armor.f@
+>`0,4,pos=@pos.x@,@pos.y@,@pos.z@
+>`0,5,dir=@player.direction@
+>`0,6,name=@player.name@
+>`0,7,ai=@ai.enabled@
+>`0,8,face=@face@
+>`0,9,key=@key@
+>`0,10,gp=@totalgp@
+>`0,11,bighead=@bighead@
+
+// item
+>`0,1,L=@item.left@ R=@item.right@
+>`0,2,potion=@item.potion@
+>`0,3,L.id=@item.left.id@ R.id=@item.right.id@
+>`0,4,L.gp=@item.left.gp@ R.gp=@item.right.gp@
+
+// time
+>`0,1,time=@time@
+>`0,2,total=@totaltime@
+>`0,3,@time.year@/@time.month@/@time.day@
+>`0,4,@time.hour@:@time.minute@:@time.second@
+
+// screen
+>`0,1,screen: @screen.i@ @screen.x@ @screen.w@x@screen.h@
+
+// res
+>`0,1,stone=@res.stone@
+>`0,2,wood=@res.wood@
+>`0,3,tar=@res.tar@
+>`0,4,ki=@res.ki@
+>`0,5,bronze=@res.bronze@
+>`0,6,crystals=@res.crystals@
+
+// rng
+>`0,1,rng=@rng@ rngf=@rngf@
+
+// harvest / pickup
+?harvest
+ >`0,1,harvest dist=@harvest.distance@ z=@harvest.z@
+?pickup
+ >`0,2,pickup dist=@pickup.distance@ z=@pickup.z@
+
+// encounter
+>`0,1,elite=@encounter.isElite@
+>`0,2,mod=@encounter.eliteMod@
+
+// input
+>`0,1,(@input.x@, @input.y@)
+
+// sys
+>`0,1,mobile=@sys.isMobile@ pc=@sys.isPC@
+>`0,2,os=@sys.os@
+>`0,3,url=@sys.fileUrl@
+
+// ambient / music
+>`0,1,ambient=@ambient@
+>`0,2,music=@music@
+
+
+// ─── 1.12 FUNCIONES NATIVAS ─────────────────────────────
+
+// loc
+loc.Leave()
+loc.Pause()
+
+// foe
+var fc = foe.GetCount(10)
+
+// item
+?item.CanActivate()
+ activate R
+var cd = item.GetCooldown("bardiche")
+var sc = item.GetCount("sword *0 -big")
+var ll = item.GetLoadoutL(1)
+var lr = item.GetLoadoutR(1)
+var tc = item.GetTreasureCount()
+var tl = item.GetTreasureLimit()
+
+// buffs / debuffs
+>`0,1,buffs=@buffs.count@ @buffs.string@
+>`0,2,debuffs=@debuffs.count@ @debuffs.string@
+var bc = buffs.GetCount("shield")
+var bt = buffs.GetTime("shield")
+var dc = debuffs.GetCount("poison")
+var dt = debuffs.GetTime("poison")
+>`0,3,oldest buff=@buffs.oldest@
+>`0,4,oldest debuff=@debuffs.oldest@
+
+// foe.buffs / foe.debuffs
+var fbc = foe.buffs.GetCount("shield")
+var fbt = foe.buffs.GetTime("shield")
+var fdc = foe.debuffs.GetCount("poison")
+var fdt = foe.debuffs.GetTime("poison")
+
+// math
+var abs = math.Abs(-5)
+var ceil = math.Ceil(2.3)
+var floor = math.Floor(2.7)
+var round = math.Round(2.5)
+var sqrt = math.Sqrt(16)
+var pow = math.Pow(2, 8)
+var clamp = math.Clamp(15, 0, 10)
+var lerp = math.Lerp(0, 100, 0.5)
+var mmax = math.Max(3, 7)
+var mmin = math.Min(3, 7)
+var sign = math.Sign(-5)
+var sinv = math.Sin(1.0)
+var cosv = math.Cos(1.0)
+var tanv = math.Tan(1.0)
+var asinv = math.Asin(0.5)
+var acosv = math.Acos(0.5)
+var atanv = math.Atan(1.0)
+var atan2v = math.Atan2(1, 1)
+var expv = math.Exp(1)
+var logv = math.Log(10, 2)
+var todeg = math.ToDeg(3.14)
+var torad = math.ToRad(180)
+var ceilI = math.CeilToInt(2.3)
+var floorI = math.FloorToInt(2.7)
+var roundI = math.RoundToInt(2.5)
+>`0,1,pi=@math.pi@ e=@math.e@
+
+// BigNumber
+var bn = math.BigNumber(999999)
+var bn2 = bn.Add(1)
+var bn3 = bn.Sub(1)
+var bn4 = bn.Mul(2)
+var bn5 = bn.Div(3)
+?bn.Gt(100)
+ >big
+?bn.Eq(999999)
+ >equal
+var bnf = bn.ToFloat()
+var bni = bn.ToInt()
+var bns = bn.ToString()
+var bnu = bn.ToUI()
+
+// color
+var rgb = color.FromRGB(255, 0, 0)
+var components = color.ToRGB("#ff0000")
+var lerpColor = color.Lerp("#ff0000", "#0000ff", 0.5)
+var rndColor = color.Random()
+
+// draw
+draw.Bg(0, 0, "#000000")
+draw.Bg(0, 0, "#000000", 10, 5)
+draw.Box(0, 0, 10, 5, "#ff0000", 1)
+draw.Clear()
+var sym = draw.GetSymbol(5, 3)
+draw.Player()
+draw.Player(10, 5)
+
+// screen
+var wx = screen.FromWorldX(100)
+var wz = screen.FromWorldZ(50)
+var sx = screen.ToWorldX(10)
+var sz = screen.ToWorldZ(5)
+screen.Next()
+screen.Previous()
+screen.ResetOffset()
+
+// string
+var parts = string.Split("Hello World !")
+var joined = string.Join(";", parts)
+var sz2 = string.Size("hello")
+var idx = string.IndexOf("hello", "ll")
+var idx2 = string.IndexOf("hello", "ll", 1)
+var sub = string.Sub("hello world", 6)
+var sub2 = string.Sub("hello world", 0, 5)
+var low = string.ToLower("FOO")
+var up = string.ToUpper("foo")
+var cap = string.Capitalize("foo")
+var eq = string.Equals("a", "b")
+var brk = string.Break("long text here", 10)
+var fmt = string.Format("Name: {0}", player.name)
+
+// int
+var s = "999"
+var parsed = int.Parse(s)
+
+// storage
+storage.Set("highscore", 100)
+var hs = storage.Get("highscore")
+var hs2 = storage.Get("highscore", 0)
+?storage.Has("highscore")
+ >yes
+storage.Delete("highscore")
+var inc = storage.Incr("counter")
+var inc2 = storage.Incr("counter", 5)
+var ks = storage.Keys()
+
+// summon
+>`0,1,summons=@summon.count@
+var sid = summon.GetId()
+var sid2 = summon.GetId(1)
+var sname = summon.GetName()
+var svar = summon.GetVar("hp")
+var sst = summon.GetState()
+var stm = summon.GetTime()
+
+// time
+var casual = time.FormatCasual(3600)
+var digital = time.FormatDigital(3600)
+
+// key
+key.Bind("ability1", "q", "")
+var ka = key.GetKeyAct("q")
+var ak = key.GetActKey("ability1")
+var ak2 = key.GetActKey2("ability1")
+var al = key.GetActLabel("ability1")
+key.ResetBinds()
+
+// ambient / music
+ambient.Add("rain")
+ambient.Stop()
+music.Play("battle")
+music.Stop()
+
+// player
+player.ShowScaredFace(30)
+var nextLeg = player.GetNextLegendName()
+
+// event
+var objId = event.GetObjectiveId(0)
+var objProg = event.GetObjectiveProgress(0)
+var objGoal = event.GetObjectiveGoal(0)
+
+// te
+var lang = te.language
+var txt = te.xt("Play")
+var tid = te.GetTID("Play")
+var eng = te.ToEnglish("Jogar")
+
+// sys
+sys.SetFileUrl("https://MyCoolDomain.com/scripts/")
+sys.MindConnect()
+
+// Type
+var typeStr = Type(i)
+?Type(i) = "int"
+ >Integer!
+
+
+// ─── 1.13 ARRAYS ─────────────────────────────────────────
+
+var arr = [1, 2, 3]
+var val = arr[0]
+var nested = arr[1]
+var cnt = arr.Count()
+arr.Clear()
+?arr.Contains(2)
+ >found
+?["a", "b", "c"].Contains("b")
+ return
+
+// Array multilínea con continuación — diferentes formas válidas
+var simple = [
+^  1,
+^  2,
+^  3
+^]
+
+var mixed = [
+^  "hello",
+^  42,
+^  true,
+^  foe.distance
+^]
+
+var nested2 = [
+^  [1, 2],
+^  [3, 4],
+^  [5, 6]
+^]
+
+var withOps = [
+^  1 + 2,
+^  math.Abs(-5),
+^  string.Size("hi")
+^]
+
+// Cierre de ] en misma línea que último elemento
+var compact = [
+^  "a", "b", "c"]
+
+// Cierre con ^ en línea aparte
+var spaced = [
+^  10,
+^  20,
+^]
+
+// Subarray vacío dentro
+var empty_inner = [
+^  [],
+^  [1],
+^]
+
+// Array con variables, strings, imports, new, y referencias a función
+var list = [variable, "aaaa",
+^ "aoeu",
+^ loc.id,
+^item.CanActivate("bardiche"),
+^item.CanActivate,
+^ import UI/BetterInfo2
+]
+
+// Array con new (referencia opaca, como import)
+var components = [
+^ new Components/Vector,
+^ new UI/Widget,
+^ import Utils/Helper
+^]
+
+// Referencia a función nativa sin llamarla
+var funcRef = item.CanActivate
+
+
+// ─── 1.14 ASCII ART ─────────────────────────────────────
+
+// Como valor de variable
+var bear = ascii
+###
+..O..
+asciiend
+
+// Como argumento de print
+>`1,0,#green,ascii
+#.-.
+(   )
+#`-´
+asciiend
+
+>f-2,0,#ff0000,ascii
+##!
+-#·#-
+##¡
+asciiend
+
+>h-2,-3,#yellow,ascii
+##_
+#| |
+_|_|_
+asciiend
+
+// En var con corchete y ascii
+var ear = [ascii
+####
+asciiend]
+
+
+// ─── 1.15 UI (objetos dinámicos, no validados) ──────────
+
+disable hud
+var root = ui.root
+var myPanel = ui.AddPanel()
+var myText = ui.AddText("Hello")
+var myButton = ui.AddButton()
+var myCanvas = ui.AddCanvas()
+var myAnim = ui.AddAnim("sprite.png")
+var style = ui.AddStyle("color:red")
+ui.Clear()
+ui.OpenInv()
+ui.OpenMind()
+ui.ShowBanner("Hello World!")
+ui.ShowBanner("Line 1", "Line 2")
+
+
+// ─── 1.16 RETURN COMO EXIT ──────────────────────────────
+
+?loc = caves
+ ?loc.begin
+  brew tar
+ :
+  return
+
+
+// ─── 1.17 EXPRESIONES COMPLEJAS ──────────────────────────
+
+var buffStr = string.Split("a:b:c", ":")
+var myData = [1, 2, 3]
+
+?foe = boss & item.GetCooldown("bardiche") = 0
+ activate R
+
+?item.potion ! empty & item.potion = auto
+ activate potion
+
+?pickup
+ equip star stone
+:
+ loadout 1
+
+?pickup.distance < 5
+ equipL star stone
+
+?loc = Rocky & harvest.distance < 7
+ equip shovel
+
+
+// ╔══════════════════════════════════════════════════════╗
+// ║  PARTE 2: CÓDIGO CON ERRORES O WARNINGS             ║
+// ╚══════════════════════════════════════════════════════╝
+
+
+// ─── 2.1 IMPORT ─────────────────────────────────────────
+
+import
+// → error: se requiere ruta
+
+import no valido
+// → error: espacios en la ruta
+
+import válido
+// → error: carácter no permitido (á)
+
+
+// ─── 2.2 VAR — NOMBRE INVÁLIDO ──────────────────────────
+
+var
+// → error: se requiere nombre de variable
+
+var válida
+// → error: carácter no ASCII en el nombre
+
+var a,b
+// → error: solo una declaración por línea
+
+var 2
+// → error: nombre no válido (empieza por número)
+
+var 2test
+// → error: nombre no válido (empieza por número)
+
+
+// ─── 2.3 VAR — NOMBRE RESERVADO (nativa del juego) ──────
+
+var b = 2
+// → error: 'b' es reservada (BigNumber)
+
+var foe = "pallas"
+// → error: 'foe' es variable nativa
+
+var hp = 100
+// → error: 'hp' es variable nativa
+
+var loc = "test"
+// → error: 'loc' es variable nativa
+
+var item = "sword"
+// → error: 'item' es variable nativa
+
+var time = 0
+// → error: 'time' es variable nativa
+
+var math = 1
+// → error: 'math' es variable nativa
+
+var draw = 0
+// → error: 'draw' es variable nativa
+
+var screen = 0
+// → error: 'screen' es variable nativa
+
+var string = ""
+// → error: 'string' es variable nativa
+
+var color = "#fff"
+// → error: 'color' es variable nativa
+
+var ai = true
+// → error: 'ai' es variable nativa
+
+var Type = 0
+// → error: 'Type' es variable nativa
+
+var ui = 0
+// → error: 'ui' es variable nativa
+
+var array = 0
+// → error: 'array' es variable nativa
+
+var pos = 0
+// → error: 'pos' es variable nativa
+
+
+// ─── 2.4 VAR — IMPORT/NEW CON RUTA INVÁLIDA ─────────────
+
+var loop2 = import funcs/loop aoeu
+// → error: ruta inválida (espacios)
+
+var obj2 = new bad path/here
+// → error: ruta inválida (espacios)
+
+
+// ─── 2.5 ASIGNACIÓN A VARIABLE NATIVA ───────────────────
+
+foe = "pallas"
+// → error: variable nativa no asignable
+
+hp = 100
+// → error: variable nativa no asignable
+
+loc = "caves"
+// → error: variable nativa no asignable
+
+totaltime = 0
+// → error: variable nativa no asignable
+
+armor = 10
+// → error: variable nativa no asignable
+
+
+// ─── 2.6 PROPIEDAD SELLADA INEXISTENTE ──────────────────
+
+foe.hellow = 2
+// → error: 'foe.hellow' no existe (sealed group)
+
+loc.invalid = 1
+// → error: 'loc.invalid' no existe
+
+item.fake = "test"
+// → error: 'item.fake' no existe
+
+math.Nope(1)
+// → error: 'math.Nope' no existe
+
+screen.invalid = 0
+// → error: 'screen.invalid' no existe
+
+string.Fake("a")
+// → error: 'string.Fake' no existe
+
+draw.Nope()
+// → error: 'draw.Nope' no existe
+
+color.Fake()
+// → error: 'color.Fake' no existe
+
+storage.Fake()
+// → error: 'storage.Fake' no existe
+
+encounter.fake = 0
+// → error: 'encounter.fake' no existe
+
+harvest.fake = 0
+// → error: 'harvest.fake' no existe
+
+input.fake = 0
+// → error: 'input.fake' no existe
+
+key.Fake()
+// → error: 'key.Fake' no existe
+
+music.Fake()
+// → error: 'music.Fake' no existe
+
+sys.Fake()
+// → error: 'sys.Fake' no existe
+
+te.Fake()
+// → error: 'te.Fake' no existe
+
+time.Fake()
+// → error: 'time.Fake' no existe
+
+ambient.Fake()
+// → error: 'ambient.Fake' no existe
+
+summon.Fake()
+// → error: 'summon.Fake' no existe
+
+res.fake = 0
+// → error: 'res.fake' no existe
+
+rng.fake = 0
+// → error: 'rng.fake' no existe
+
+pickup.fake = 0
+// → error: 'pickup.fake' no existe
+
+player.fake = 0
+// → error: 'player.fake' no existe
+
+event.Fake()
+// → error: 'event.Fake' no existe
+
+int.Fake()
+// → error: 'int.Fake' no existe
+
+
+// ─── 2.7 NOMBRE DE FUNCIÓN INVÁLIDO ─────────────────────
+
+func 2aa()
+ return
+// → error: nombre no válido (empieza por número)
+
+func á()
+ return
+// → error: nombre no válido (carácter no ASCII)
+
+func test() aeou
+ return
+// → error: tokens inesperados tras la firma
+
+
+// ─── 2.8 CONDICIONES — ERRORES DE SINTAXIS ──────────────
+
+?
+// → error: condición vacía
+
+:?
+// → error: condición :? vacía
+
+?jar var
+// → error: 'var' es palabra reservada en condición
+
+?jar func
+// → error: 'func' es palabra reservada en condición
+
+?jar import
+// → error: 'import' es palabra reservada en condición
+
+?jar return
+// → error: 'return' es palabra reservada en condición
+
+?jar for
+// → error: 'for' es palabra reservada en condición
+
+?jar break
+// → error: 'break' es palabra reservada en condición
+
+// Palabras sin operador (bare identifiers)
+?foe skeleton
+// → error: token inesperado sin operador
+
+?klk?manin
+// → error: ? embebido en condición
+
+?foe == true
+// → error: operador inválido (==)
+
+?foe =! true
+// → error: operador inválido (=!)
+
+?foe !! true
+// → error: operador inválido (!!)
+
+?foe.test > 0
+// → error: propiedad sellada inexistente
+
+?loc.fake = caves
+// → error: propiedad sellada inexistente
+
+?hp < foe.hp aoeu
+// → error: trailing junk (aoeu sin operador)
+
+?test() aeuo
+// → error: trailing junk tras llamada
+
+?foe;boss
+// → error: carácter inválido (;)
+
+
+// ─── 2.9 CONTINUACIÓN — ERRORES ─────────────────────────
+
+^
+// → error: continuación vacía (^ sin contenido)
+
+
+// ─── 2.10 ELSE INVÁLIDO ─────────────────────────────────
+
+: algo aquí
+// → error: contenido inesperado tras ':'
+
+:esto tampoco
+// → error: contenido inesperado tras ':'
+
+
+// ─── 2.11 BLOQUES VACÍOS ────────────────────────────────
+
+?true
+
+?false
+ return
+// → error: el primer ?true no tiene hijos
+
+func vacia()
+
+return
+// → error: func vacia() no tiene hijos
+
+
+// ─── 2.12 INDENTACIÓN INCORRECTA ────────────────────────
+
+  loadout 1
+// → error: indentación huérfana (sin padre)
+
+?true
+ loadout 1
+   loadout 2
+// → error: indentación inconsistente
+
+
+// ─── 2.13 COMANDO / PALABRA NO RECONOCIDA ───────────────
+
+pepito
+// → error: no es comando ni función reconocida
+
+klkmanin
+// → error: no es comando ni función reconocida
+
+
+// ─── 2.14 VARIABLE NATIVA COMO STATEMENT ────────────────
+
+foe
+// → error: variable nativa usada como statement
+
+hp
+// → error: variable nativa usada como statement
+
+loc
+// → error: variable nativa usada como statement
+
+
+// ─── 2.15 TRAILING JUNK EN LLAMADA A FUNCIÓN ────────────
+
+func test3()
+ return
+test3() aoeu
+// → error: token inesperado tras la llamada
+
+
+// ─── 2.16 ASCIIEND SUELTO ───────────────────────────────
+
+asciiend
+// → error: asciiend sin bloque ascii previo
+
+
+// ─── 2.17 ASCII FUERA DE CONTEXTO ───────────────────────
+
+ascii
+####
+asciiend
+// → error: ascii solo válido como var o print arg
+
+
+// ─── 2.18 VARIABLE NO DECLARADA (warning, no error) ─────
+
+?noExiste > 10
+ return
+// → warning: 'noExiste' no está declarada
+
+var resultado = otraNoExiste + 1
+// → warning: 'otraNoExiste' no está declarada
+
+
+// ─── 2.19 PROPIEDAD SELLADA EN CONDICIÓN ────────────────
+
+?foe.test > 0
+// → error: 'foe.test' no existe (sealed)
+
+?loc.noExiste = true
+// → error: 'loc.noExiste' no existe (sealed)
+
+?encounter.fake = true
+// → error: 'encounter.fake' no existe (sealed)
