@@ -33,8 +33,10 @@ const W = {
   SEALED_PROP:  'sealed_property',
   BAD_STATEMENT:'invalid_statement',
   BAD_EXPR:     'invalid_expression',
-  BAD_CONTINUE: 'invalid_continuation', BAD_ASCII: 'invalid_ascii',
-  BAD_ARG_TYPE:  'invalid_arg_type',  UNDECLARED_VAR: 'undeclared_variable',
+  BAD_CONTINUE: 'invalid_continuation',
+  BAD_ASCII:    'invalid_ascii',
+  BAD_ARG_TYPE: 'invalid_arg_type',
+  UNDECLARED_VAR: 'undeclared_variable',
 };
 
 const SCOPE_OPENERS = [B.CONDITION, B.ELSEIF, B.ELSE, B.FUNC_DEF, B.FOR_LOOP];
@@ -78,6 +80,9 @@ class StonescriptParser {
     this.importValidate = {};
     // Loaded from var.validate
     this.varValidate = {};
+
+    // FIX: Initialize _inlineArgWarnings to prevent contamination
+    this._inlineArgWarnings = [];
 
     this._buildIndex();
   }
@@ -154,11 +159,16 @@ class StonescriptParser {
   // ── PUBLIC API ────────────────────────────────────────────
   format(code) { return this.toHtml(this.parse(code)); }
   parse(code) {
+    // FIX: Reset mutable state before each parse to prevent contamination
+    this._inlineArgWarnings = [];
+
     const lines  = this._splitLines(code);
     // Track source line number for each split block
     // A split block may span multiple source lines (e.g. /* */ or ascii)
     let srcLine = 0;
     const flat = lines.map(l => {
+      // FIX: Flush inline warnings between blocks to prevent contamination
+      this._inlineArgWarnings = [];
       const b      = this._parseLine(l);
       b.lineNum    = srcLine;
       srcLine     += (l.match(/\n/g) || []).length + 1;
@@ -210,9 +220,6 @@ class StonescriptParser {
     const self = this;
     (function check(bs) {
       for (const b of bs) {
-        // Re-tokenize expressions to find unknown identifiers
-        // We do this by inspecting existing tokens of type T.IDENTIFIER
-        // that are not native vars, not declared, and not import roots
         self._checkBlockIdentifiers(b, declared, importRoots);
         check(b.children);
       }
@@ -224,16 +231,7 @@ class StonescriptParser {
     // If block already has unknown_command error, skip undeclared check — it's redundant
     if (block.warnings.some(w => w.type === W.UNKNOWN_CMD)) return;
 
-    // Contexts where an identifier is NOT a variable reference:
-    // - Right-hand side of = in a comparison: ?foe=boss → 'boss' is a string value
-    // - Import path: var x=import Utils/File → 'Utils' is a path segment
-    // - Func definition name: func myFunc() → 'myFunc' is being defined
-    // - Func param names (already added to declared in scope collection)
-    // We skip tokens that follow an operator '=' or '!' in a condition context.
-
     // Build a set of positions to skip (RHS of comparisons)
-    // After '=' or '!' skip ALL tokens until next logical operator (& |) or paren/bracket.
-    // Covers multi-word RHS: ?loc=haunted rocky → both 'haunted' and 'rocky' skipped.
     const skipPositions = new Set();
     const COMPARISON_OPS = this.comparisonOps;
     const LOGICAL_OPS    = this.logicalOps;
@@ -251,28 +249,14 @@ class StonescriptParser {
       }
     }
 
-    // func_def and for_loop: the identifier right after keyword is a definition name, not usage
     const isDefinition = block.type === B.FUNC_DEF || block.type === B.FOR_LOOP;
-
-    // keyword 'import': the arg is a path, not a variable
     const isImport = block.type === B.KEYWORD && block.name === 'import';
-
-    // keyword 'var': the name is being declared, value may reference other vars (checked separately)
     const isVar = block.type === B.KEYWORD && block.name === 'var';
-
-    // Commands: their argument is a search_string, ability_id, etc. — not variable references
-    // We skip all IDENTIFIER tokens in the arg portion (after the command token)
     const LITERAL_ARG_FOLLOWS = this.literalArgFollows;
     const isLiteralArgCmd = block.type === B.COMMAND && block.def &&
       LITERAL_ARG_FOLLOWS.has(block.def.follows);
-
-    // Print blocks: the argument is a formatted string, not a variable reference
     const isPrint = block.type === B.PRINT;
 
-    // Condition with no comparison operator: ?a or ?loc.begin — bare boolean expression.
-    // In this case, an IDENTIFIER directly after '?' (with no operator) could be a valid
-    // user variable used as a boolean. We still warn, but only if there's no way it's valid.
-    // We track whether we've seen a comparison operator in the condition.
     let condHasOperator = false;
     if (block.type === B.CONDITION || block.type === B.ELSEIF) {
       condHasOperator = block.tokens.some(([t,v]) =>
@@ -289,16 +273,14 @@ class StonescriptParser {
 
     for (let i = 0; i < block.tokens.length; i++) {
       const [type, value] = block.tokens[i];
-      if (type !== T.IDENTIFIER) continue; // only check IDENTIFIER, not VARIABLE (natives are fine)
-      if (skipPositions.has(i)) continue;  // RHS of comparison — skip
-      if (isDefinition && i <= 2) continue; // func/for name token — skip
-      if (isImport) continue;               // entire arg is a path
-      if (isVar) continue;                  // var declaration tokens — skip entirely
-      if (isPrint) continue;                // print args are strings
-      if (isLiteralArgCmd && i >= cmdArgStart) continue; // command literal arg — skip
-      // Method access: identifier after '.' is a method call on an object.
-      // If the receiver is a variable/paren (e.g. x.Method(), obj.f()) → skip (opaque).
-      // If the receiver is ']' (array literal [].Method()) → check against known array methods.
+      if (type !== T.IDENTIFIER) continue;
+      if (skipPositions.has(i)) continue;
+      if (isDefinition && i <= 2) continue;
+      if (isImport) continue;
+      if (isVar) continue;
+      if (isPrint) continue;
+      if (isLiteralArgCmd && i >= cmdArgStart) continue;
+      // Method access after '.'
       {
         let prevMeaningful = null, prevPrev = null;
         for (let j = i - 1; j >= 0; j--) {
@@ -307,35 +289,25 @@ class StonescriptParser {
           prevPrev = block.tokens[j]; break;
         }
         if (prevMeaningful && prevMeaningful[0] === T.STRING && prevMeaningful[1] === '.') {
-          // After '.': if receiver is ']' → array literal, check if method exists
           if (prevPrev && prevPrev[0] === T.BRACKET && prevPrev[1] === ']') {
-            // Array literal method — check it's a known array function
             const arrayMethod = 'array.' + value;
             if (this.byId[arrayMethod] || this._lookupFuncOrVar(arrayMethod)) continue;
-            // Unknown array method — fall through to undeclared check
           } else {
             continue; // variable/object method — skip (type unknown at parse time)
           }
         }
       }
-      // Bare boolean condition: ?a with no operator — still warn (might be truly undeclared)
-      // but only after all other skips
 
       // Skip boolean literals
       if (value === 'true' || value === 'false') continue;
-      // Skip numeric-like
       if (/^[^a-zA-Z_]/.test(value)) continue;
-      // Skip keywords
       if (this.keywordSet.has(value.toLowerCase())) continue;
-      // Skip known natives
       if (this.varRoots.includes(value.split('.')[0])) continue;
       if (this.byId[value]) continue;
       const def = this._lookupFuncOrVar(value);
       if (def) continue;
-      // Skip import root properties (x.method where var x=import y)
       const root = value.split('.')[0];
       if (importRoots.has(root)) continue;
-      // Skip declared user variables
       if (declared.has(root)) continue;
 
       // Unknown identifier — warning
@@ -388,7 +360,7 @@ class StonescriptParser {
       const line = lines[i];
 
       // A multiline block /* ... */ starts only when:
-      // 1. The line is not a // line comment (// before /* means /* is inside the comment)
+      // 1. The line is not a // line comment
       // 2. /* appears with no code before it (only whitespace)
       // 3. The block does NOT close on the same line
       const isLineComment = line.trimStart().startsWith('//');
@@ -436,16 +408,24 @@ class StonescriptParser {
 
   // ── PASS 1B: LINE PARSER ──────────────────────────────────
   _parseLine(rawLine) {
+    // FIX: Reset inline warnings at the start of each line parse
+    this._inlineArgWarnings = [];
+
     if (rawLine.includes('\n')) {
-      const indent = this._leadingSpaces(rawLine);
+      const indent = this._indentWidth(rawLine);
       const content = rawLine.trimStart();
       if (this._isAsciiBlock(content)) {
         return this._parseAsciiBlock(indent, content);
       }
       return this._block(B.COMMENT, indent, content, [[T.COMMENT, content]]);
     }
-    const indent  = this._leadingSpaces(rawLine);
-    const content = rawLine.slice(indent);
+
+    // FIX: Use _indentWidth for visual indent and trimStart() for content extraction.
+    // Previously used rawLine.slice(indent) which breaks with tabs because
+    // _leadingSpaces counts tabs as 2 chars but they are only 1 character.
+    const indent  = this._indentWidth(rawLine);
+    const content = rawLine.trimStart();
+
     if (content === '' || content.trim() === '') return this._block(B.EMPTY, indent, '', []);
 
     // ^ continuation
@@ -465,72 +445,78 @@ class StonescriptParser {
     if (content.startsWith(':?')) {
       const after = content.slice(2), expr = after.trimStart();
       const warnings = [
-        ...(expr === '' ? [this._warn(W.EMPTY_EXPR, 'La condicion :? esta vacia')] : []),
+        ...(expr === '' ? [this._warn(W.EMPTY_EXPR, 'La condicion :? esta vacia.')] : []),
         ...this._checkConditionExpr(expr),
       ];
-      return this._block(B.ELSEIF, indent, content,
-        [[T.CONTROL, ':?'], ...this._tokenizeExpr(after)], { value: expr, warnings });
+      const tokens = [[T.CONTROL, ':?'], ...this._tokenizeExpr(after)];
+      return this._block(B.ELSEIF, indent, content, tokens, { name: ':?', value: expr, warnings });
     }
 
-    // : else — valid forms:
-    //   ':'           bare else
-    //   ': '          else with trailing space (before comment)
-    //   ':// ...'     else with inline // comment (no space required)
-    //   ':/* ... */'  else with inline /* comment
-    // Anything else after ':' (e.g. ':/foo', ':bar') is invalid.
+    // : else  — strict validation
     if (content[0] === ':') {
       const afterColon = content.slice(1);
-      const trimmed    = afterColon.trimStart();
-      const isValid    = afterColon === ''
-        || trimmed.startsWith('//')
-        || trimmed.startsWith('/*');
-      const tokens = [[T.CONTROL, ':']];
-      if (afterColon.trim()) tokens.push(...this._tokenizeExpr(afterColon));
-      const warns = isValid ? [] : [this._warn(W.BAD_EXPR,
-        `Sintaxis invalida tras ':'. Solo se permite ':' solo, ': // comentario' o ': /* comentario */'.`)];
-      return this._block(B.ELSE, indent, content, tokens, { warnings: warns });
+      // Valid: ':' alone, '://', ':/*', ': //', ': /*'
+      const trimmedAfter = afterColon.trimStart();
+      if (trimmedAfter === '' || trimmedAfter.startsWith('//') || trimmedAfter.startsWith('/*')) {
+        const tokens = [[T.CONTROL, ':']];
+        if (afterColon) tokens.push([T.COMMENT, afterColon]);
+        return this._block(B.ELSE, indent, content, tokens, { name: ':' });
+      }
+      // Invalid content after ':'
+      const tokens   = [[T.CONTROL, ':'], ...this._tokenizeExpr(afterColon)];
+      const warnings = [this._warn(W.BAD_EXPR,
+        `Contenido inesperado tras ':'. Usa ':?' para elseif o ':' solo para else.`)];
+      return this._block(B.ELSE, indent, content, tokens, { name: ':', warnings });
     }
 
     // ? condition
     if (content[0] === '?') {
       const after = content.slice(1), expr = after.trimStart();
       const warnings = [
-        ...(expr === '' ? [this._warn(W.EMPTY_EXPR, 'La condicion ? esta vacia')] : []),
+        ...(expr === '' ? [this._warn(W.EMPTY_EXPR, 'La condicion ? esta vacia.')] : []),
         ...this._checkConditionExpr(expr),
       ];
-      return this._block(B.CONDITION, indent, content,
-        [[T.CONTROL, '?'], ...this._tokenizeExpr(after)], { value: expr, warnings });
+      const tokens = [[T.CONTROL, '?'], ...this._tokenizeExpr(after)];
+      return this._block(B.CONDITION, indent, content, tokens, { name: '?', value: expr, warnings });
     }
 
-    // Print prefixes
+    // Print prefixes (longest first)
     for (const pfx of this.printPfx) {
       if (content.startsWith(pfx)) {
-        const arg    = content.slice(pfx.length);
+        const arg = content.slice(pfx.length);
         const tokens = [[T.PRINT, pfx]];
-        if (arg !== '') tokens.push([T.STRING, arg]);
-        return this._block(B.PRINT, indent, content, tokens,
-          { name: pfx, value: arg, def: this.byId[pfx] || null });
+        if (arg) tokens.push([T.STRING, arg]);
+        return this._block(B.PRINT, indent, content, tokens, { name: pfx, value: arg });
       }
     }
 
-    // Multi-word commands
-    const lcContent = content.toLowerCase();
-    for (const mc of this.multiCmds) {
-      if (lcContent.startsWith(mc.toLowerCase())) {
-        const rest = content.slice(mc.length), arg = rest.trimStart();
-        const def  = this.byId[mc] || null;
-        const warnings = this._checkFollow(def, arg);
-        const tokens   = [[T.COMMAND, content.slice(0, mc.length)]];
-        if (arg !== '') { tokens.push([T.SPACE, ' ']); tokens.push(...this._tokenizeArg(arg, def)); }
-        return this._block(B.COMMAND, indent, content, tokens, { name: mc, value: arg, def, warnings });
+    // Multi-word commands (longest first)
+    for (const cmd of this.multiCmds) {
+      const lcLine = content.toLowerCase();
+      if (lcLine.startsWith(cmd.toLowerCase())) {
+        const afterCmd = content.slice(cmd.length);
+        if (afterCmd === '' || /^\s/.test(afterCmd)) {
+          const arg    = afterCmd.trimStart();
+          const def    = this.byId[cmd] || null;
+          const warnings = [...this._checkFollow(def, arg), ...this._checkCommand(cmd.toLowerCase(), arg, def)];
+          const tokens   = [[T.COMMAND, content.slice(0, cmd.length)]];
+          if (arg !== '') {
+            const spaces = afterCmd.slice(0, afterCmd.length - afterCmd.trimStart().length);
+            tokens.push([T.SPACE, spaces || ' ']);
+            tokens.push(...this._tokenizeArg(arg, def));
+          }
+          return this._block(B.COMMAND, indent, content, tokens, { name: cmd, value: arg, def, warnings });
+        }
       }
     }
 
+    // Word-based parsing (keywords, single commands, func calls, assignments)
     if (/^[a-zA-Z_]/.test(content)) return this._parseWordLine(indent, content);
-    this._inlineArgWarnings = [];
-    const rawTokens = this._tokenizeExpr(content);
-    const rawWarns  = this._flushInlineWarnings();
-    return this._block(B.RAW, indent, content, rawTokens, { warnings: rawWarns });
+
+    // Fallback: raw
+    const tokens   = this._tokenizeExpr(content);
+    const warnings = this._flushInlineWarnings();
+    return this._block(B.RAW, indent, content, tokens, { warnings });
   }
 
   _parseWordLine(indent, content) {
@@ -556,7 +542,6 @@ class StonescriptParser {
       const arg    = rest.trimStart(), def = this.byId[lc] || null;
       const tokens = [[T.KEYWORD, word]];
       if (arg !== '') {
-        // Preserve the original whitespace between keyword and argument
         const spaces = rest.slice(0, rest.length - rest.trimStart().length);
         tokens.push([T.SPACE, spaces || ' ']);
         tokens.push(...this._tokenizeExpr(arg));
@@ -585,6 +570,8 @@ class StonescriptParser {
     // Bare word: Rule 3 (bad statement) + Rule 7 (sealed prop)
     const warnings = this._checkBareWord(word, rest);
     const tokens   = [...this._resolveIdentToken(word), ...this._tokenizeExpr(rest)];
+    // FIX: Flush inline warnings for bare word/raw blocks
+    warnings.push(...this._flushInlineWarnings());
     return this._block(B.RAW, indent, content, tokens, { name: word, warnings });
   }
 
@@ -674,7 +661,6 @@ class StonescriptParser {
     b.children = b.children.map(ci => this._nestBlock(blocks, ci));
     return b;
   }
-  // lineNum is already set on each block in parse()
 
   // ── TOKENIZERS ────────────────────────────────────────────
   _tokenizeExpr(expr) {
@@ -725,7 +711,6 @@ class StonescriptParser {
           // Try direct lookup, then 'array.X' if previous meaningful token was ']'.'
           let def = this._lookupFuncOrVar(word);
           if (!def) {
-            // Check if last meaningful token was '.' following ']' → array method
             const lastTok = tokens.length ? tokens[tokens.length - 1] : null;
             const prevTok = tokens.length > 1 ? tokens[tokens.length - 2] : null;
             if (lastTok && lastTok[0] === T.STRING && lastTok[1] === '.' &&
@@ -823,21 +808,17 @@ class StonescriptParser {
 
   // ── VALIDATION (data-driven) ──────────────────────────────
 
-  // Rule 1+2: condition expression validation
-  // Uses condValidate loaded from ?.validate in JSON
   _checkConditionExpr(expr) {
     if (!expr) return [];
     const warns = [];
-    this._inlineArgWarnings = []; // reset before tokenizing this expression
+    // FIX: Reset inline warnings before tokenizing
+    this._inlineArgWarnings = [];
 
-    // Semicolons (and other explicitly invalid chars)
     if (INVALID_EXPR_CHARS.test(expr))
       warns.push(this._warn(W.BAD_EXPR,
         `Caracter invalido en la expresion: '${expr.match(INVALID_EXPR_CHARS)[0]}'. ` +
         `Las condiciones no admiten ';'. Usa '&' para combinar condiciones.`));
 
-    // Double/invalid operator sequences (==, =!, !!, =<, etc.)
-    // Read valid ops from the JSON condValidate if available
     const doubleOps = expr.match(/[=!<>]{2,}/g);
     if (doubleOps) {
       for (const seq of doubleOps) {
@@ -847,16 +828,11 @@ class StonescriptParser {
       }
     }
 
-    // Embedded ? (condition inside expression: ?klk?manin)
-    // JSON: condValidate.no_embedded_condition
     if (this.condValidate.no_embedded_condition && expr.includes('?'))
       warns.push(this._warn(W.BAD_EXPR,
         `'?' no puede aparecer dentro de una expresion de condicion.`));
 
-    // Keywords as operands (var, func, return…)
-    // JSON: condValidate.no_keywords_as_operands + __validation__.keywords_not_allowed_in_expr
     if (this.condValidate.no_keywords_as_operands && this.keywordsNotInExpr.size) {
-      // Tokenize the expression and look for keyword-type identifiers
       const words = expr.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || [];
       for (const w of words) {
         if (this.keywordsNotInExpr.has(w.toLowerCase()))
@@ -865,39 +841,28 @@ class StonescriptParser {
       }
     }
 
-    // Bare string without operator (e.g. ?foe "skeleton")
-    // JSON: condValidate.no_bare_string
     if (this.condValidate.no_bare_string) {
-      // Detect: identifier/variable followed directly by a quoted string with no operator between
       if (/[a-zA-Z0-9_]\s+"/.test(expr) || /[a-zA-Z0-9_]\s+'/.test(expr))
         warns.push(this._warn(W.BAD_EXPR,
           `String literal sin operador. Usa un operador de comparacion: = ! < > <= >=`));
     }
 
-    // Sealed property access inside the expression (e.g. ?foe.test>0)
     const dottedWords = expr.match(/\b[a-zA-Z_][a-zA-Z0-9_.]*\b/g) || [];
     for (const dw of dottedWords) {
       if (!dw.includes('.')) continue;
       warns.push(...this._checkSealedProp(dw));
     }
 
-    // Trailing junk (e.g. ?hp<foe.hp aoeu)
     warns.push(...this._checkCondTrailingJunk(expr));
 
-    // Collect any inline arg type warnings from _tokenizeExpr
-    if (this._inlineArgWarnings && this._inlineArgWarnings.length) {
-      warns.push(...this._inlineArgWarnings);
-      this._inlineArgWarnings = [];
-    }
+    // FIX: Always flush inline warnings after condition check
+    warns.push(...this._flushInlineWarnings());
 
     return warns;
   }
 
-  // Rule: continuation (^) must start with & | ( .
-  // JSON: __validation__.continuation_must_start_with
   _checkContinuation(rest) {
     if (!rest || !this.continuationStartsWith.size) return [];
-    const first = rest[0];
     if ([...this.continuationStartsWith].some(s => rest.startsWith(s))) return [];
     return [this._warn(W.BAD_CONTINUE,
       `Una linea de continuacion ^ debe empezar con & o | (conector logico) ` +
@@ -905,7 +870,6 @@ class StonescriptParser {
       `Se encontro: '${rest.slice(0, 10)}'`)];
   }
 
-  // Rule 3 + 7: bare identifier on its own line
   _checkBareWord(word, rest) {
     const sealedWarn = this._checkSealedProp(word);
     if (sealedWarn.length) return sealedWarn;
@@ -921,7 +885,6 @@ class StonescriptParser {
       `'${word}' no es un comando, variable ni funcion reconocida.`)];
   }
 
-  // Rule 7: sealed group property check
   _checkSealedProp(name) {
     if (!name.includes('.')) return [];
     const root = name.split('.')[0];
@@ -936,18 +899,10 @@ class StonescriptParser {
       `sus propiedades estan fijadas por el juego.`)];
   }
 
-  // Rule 4: import validation — reads from importValidate (JSON)
-  // '//' always starts a comment in Stonescript (with or without space before it).
-  // So 'import valido//comment' → path is 'valido', comment is '//comment'.
-  // But 'import test//bad' also strips to 'test' which is valid —
-  // the double-slash in the path is swallowed by the comment strip.
-  // This matches Stonescript's actual behaviour: // is always a comment delimiter.
   _checkImport(path) {
-    // Strip everything from // onward (always a comment)
     const commentIdx = path.indexOf('//');
     const stripped   = (commentIdx >= 0 ? path.slice(0, commentIdx) : path).trim();
     if (!stripped) return [];
-    // Spaces inside (after strip+trim): genuine error
     if (this.importValidate.no_spaces && /\s/.test(stripped))
       return [this._warn(W.BAD_IMPORT,
         `La ruta '${stripped}' no puede contener espacios.`)];
@@ -961,42 +916,33 @@ class StonescriptParser {
     return [];
   }
 
-  // Rule 5: var declaration validation — reads from varValidate (JSON)
   _checkVarDecl(arg) {
     const trimmed = arg.trim();
     if (!trimmed) return [];
 
-    // Split name from value: var name = value  or  var name
     const eqIdx  = trimmed.indexOf('=');
     const namePart = (eqIdx >= 0 ? trimmed.slice(0, eqIdx) : trimmed).trim();
     const valPart  = eqIdx >= 0 ? trimmed.slice(eqIdx + 1).trim() : '';
 
-    // Multiple declarations: var a,b
     if (/,/.test(namePart))
       return [this._warn(W.BAD_VAR,
         `Solo se puede declarar una variable a la vez. Usa una linea 'var' por variable.`)];
 
-    // Extra words in the name part: var a b = ...
     if (/\s/.test(namePart))
       return [this._warn(W.BAD_VAR,
         `Solo se puede declarar una variable a la vez. Usa una linea 'var' por variable.`)];
 
     const name = namePart;
-
-    // Valid identifier
     const pattern = this.varValidate.identifier_pattern || '^[a-zA-Z_][a-zA-Z0-9_]*$';
     if (!new RegExp(pattern).test(name))
       return [this._warn(W.BAD_VAR,
         `'${name}' no es un nombre de variable valido. ` +
         `Debe empezar por letra o _ y solo contener letras a-z A-Z, digitos 0-9 y _.`)];
 
-    // Reserved native name
     if (this.reservedNames.has(name))
       return [this._warn(W.BAD_VAR,
         `'${name}' es una variable nativa del juego y no puede usarse como nombre de variable.`)];
 
-    // Junk after value: var test = aoeu aoeu
-    // Exception: var x = import Some/Path is valid (stored import reference)
     if (this.varValidate.no_junk_after_value && valPart) {
       if (/^import\s/.test(valPart.trim())) {
         const pathMatch = valPart.trim().match(/^import\s+(.*)/);
@@ -1012,9 +958,6 @@ class StonescriptParser {
     return [];
   }
 
-  // Detect trailing junk in an expression value: multiple words without operator
-  // Skips tokens inside () and [] — those are function args or array elements, not junk.
-  // Returns the junk word or null if clean
   _detectExprJunk(val) {
     const tokens     = this._tokenizeExpr(val);
     const VALUE_TYPES = new Set(['identifier','variable','number','string']);
@@ -1026,7 +969,7 @@ class StonescriptParser {
       if (type === 'paren'   && value === ')') { depth = Math.max(0,depth-1); lastType='paren'; continue; }
       if (type === 'bracket' && value === '[') { depth++; lastType = null; continue; }
       if (type === 'bracket' && value === ']') { depth = Math.max(0,depth-1); lastType='bracket'; continue; }
-      if (depth > 0) continue; // inside () or [] — skip junk check
+      if (depth > 0) continue;
       if (VALUE_TYPES.has(type) && VALUE_TYPES.has(lastType)) {
         return value;
       }
@@ -1035,43 +978,26 @@ class StonescriptParser {
     return null;
   }
 
-  // Rule 6: activate — data-driven from activate.arg_validation in JSON
-  // fixed_values: always valid (l/r/p/left/right/potion)
-  // known_ability_ids: known item ability ids (bardiche, bash...)
-  // charset: what chars are allowed at all
   _checkActivate(arg) {
     if (!arg.trim()) return [];
     const val = arg.trim();
     const lc  = val.toLowerCase();
-
-    // Multi-word: never valid
     if (/\s/.test(val))
       return [this._warn(W.BAD_ACTIVATE,
         `'${val}' no puede contener espacios. ` +
         `Fijos validos: ${[...this.abilityFixed].join(', ')}.`)];
-
-    // Charset check (from activate.arg_validation.charset in JSON)
     if (!this.abilityCharset.test(val))
       return [this._warn(W.BAD_ACTIVATE,
         `'${val}' contiene caracteres no validos. ` +
         `Solo se permiten letras a-z A-Z, digitos y _.`)];
-
-    // Fixed values are always valid (case-insensitive)
     if (this.abilityFixed.has(lc)) return [];
-
-    // Known ability IDs are valid
     if (this.abilityKnown.has(lc)) return [];
-
-    // Unknown — report error with both lists
-    const all = [...this.abilityFixed, ...this.abilityKnown].sort();
     return [this._warn(W.BAD_ACTIVATE,
       `'${val}' no es un ability ID reconocido. ` +
       `Fijos: ${[...this.abilityFixed].join(', ')}. ` +
       `Conocidos: ${[...this.abilityKnown].join(', ')}.`)];
   }
 
-  // Rule: func signature — name must be valid identifier, no trailing junk
-  // Data-driven: func.validate.name_pattern and no_trailing_junk from JSON
   _checkFuncSig(sig) {
     const trimmed = sig.trim();
     const warns   = [];
@@ -1097,30 +1023,20 @@ class StonescriptParser {
     return warns;
   }
 
-  // Rule: assignment to native (sealed) variable
-  // Data-driven: non_assignable_roots from __validation__ in JSON
   _checkAssignment(name) {
     const root = name.split('.')[0];
     if (this.nonAssignableRoots.has(root))
       return [this._warn(W.BAD_STATEMENT,
         `'${name}' es una variable nativa y no puede ser asignada.`)];
-    // Also check sealed prop for dotted names (foe.hello = 2)
     return this._checkSealedProp(name);
   }
 
-  // Rule: no trailing junk after condition expression
-  // e.g. ?hp<foe.hp aoeu  → 'aoeu' has no operator before it
-  // e.g. ?test() aeuo     → 'aeuo' follows ')' with no operator
-  // Rule: no trailing junk after condition expression
-  // Tokens inside function call parentheses are skipped (they are arguments, not junk)
-  // Rule: no trailing junk after condition expression
-  // Tokens inside () and [] are skipped. Dot as method separator resets context.
   _checkCondTrailingJunk(expr) {
     if (!expr || !this.condValidate.no_trailing_junk) return [];
     const tokens = this._tokenizeExpr(expr);
     let lastMeaningful = null;
     let depth    = 0;
-    let inRHS    = false; // after a comparison op, skip until logical op or end
+    let inRHS    = false;
     const COMPARISON_OPS = this.comparisonOps;
     const LOGICAL_OPS    = this.logicalOps;
     for (const [type, value] of tokens) {
@@ -1135,17 +1051,14 @@ class StonescriptParser {
         else { depth = Math.max(0, depth - 1); if (depth === 0) lastMeaningful = 'bracket'; }
         continue;
       }
-      if (depth > 0) continue; // inside () or [] — skip
-      // Logical operators end the RHS and reset context
+      if (depth > 0) continue;
       if (type === 'operator' && LOGICAL_OPS.has(value)) {
         inRHS = false; lastMeaningful = 'operator'; continue;
       }
-      // Comparison operators start an RHS — everything after is the value string
       if (type === 'operator' && COMPARISON_OPS.has(value)) {
         inRHS = true; lastMeaningful = 'operator'; continue;
       }
-      if (inRHS) continue; // inside RHS — multi-word values like 'haunted halls' are valid
-      // '.' as string is a method access separator — resets junk context
+      if (inRHS) continue;
       if (type === 'string' && value === '.') { lastMeaningful = null; continue; }
       if ((type === 'identifier' || type === 'variable') &&
           lastMeaningful &&
@@ -1159,7 +1072,6 @@ class StonescriptParser {
     return [];
   }
 
-  // Dispatch keyword validations
   _checkKeyword(lc, arg, def) {
     if (lc === 'import') return this._checkImport(arg);
     if (lc === 'var')    return this._checkVarDecl(arg);
@@ -1171,7 +1083,6 @@ class StonescriptParser {
     return [];
   }
 
-  // ── LEGACY VALIDATION ─────────────────────────────────────
   _checkFollow(def, arg) {
     if (!def || !def.follows) return [];
     if (arg.trim() !== '') return [];
@@ -1180,8 +1091,7 @@ class StonescriptParser {
     if (!required) return [];
     return [this._warn(W.BAD_FOLLOW, `'${def.id}' requiere un argumento (${def.follows})`)];
   }
-  // Validate argument types against the function signature (data-driven from JSON)
-  // Only checks literal values — variables/expressions are always accepted.
+
   _checkArgTypes(def, callStr) {
     if (!this.argTypeCheckEnabled || !def.args) return [];
     const m = callStr.trim().match(/^\((.*?)\)$/s);
@@ -1189,7 +1099,6 @@ class StonescriptParser {
     const inner = m[1].trim();
     if (!inner) return [];
 
-    // Split args respecting nested parens/brackets
     const rawArgs = [];
     let depth = 0, cur = '';
     for (const ch of inner + ',') {
@@ -1205,19 +1114,16 @@ class StonescriptParser {
       const argVal  = rawArgs[i];
       if (!argVal || !argDef.type) continue;
 
-      // Determine the token type of the literal value
       const tokenType = this._classifyArgValue(argVal);
-      if (!tokenType) continue;      // complex expression — skip
-      if (tokenType === 'variable') continue; // variable — type unknown at parse time, skip
+      if (!tokenType) continue;
+      if (tokenType === 'variable') continue;
 
       const rules = this.argTypeRules[argDef.type];
-      if (!rules) continue; // unknown type — skip
+      if (!rules) continue;
 
       const validTokens = rules.valid_tokens || [];
       if (!validTokens.includes(tokenType)) {
-        // bool: 'true'/'false' are classified as 'bool' by _classifyArgValue
         if (argDef.type === 'bool' && tokenType === 'bool') continue;
-        // number/int/float: all accept numeric literals
         if (['number','int','float'].includes(argDef.type) && tokenType === 'number') continue;
         warns.push(this._warn(W.BAD_ARG_TYPE,
           `Argumento '${argDef.name}' de '${def.id}': se esperaba ${argDef.type}, ` +
@@ -1227,16 +1133,14 @@ class StonescriptParser {
     return warns;
   }
 
-  // Classify a single argument value as a token type.
-  // Returns null if the value is a complex expression (safe to skip type check).
   _classifyArgValue(val) {
     const v = val.trim();
     if (!v) return null;
-    if (/^".*"$/.test(v) || /^'.*'$/.test(v)) return 'string'; // string literal
-    if (/^-?\d+(\.\d+)?$/.test(v)) return 'number';           // numeric literal
+    if (/^".*"$/.test(v) || /^'.*'$/.test(v)) return 'string';
+    if (/^-?\d+(\.\d+)?$/.test(v)) return 'number';
     if (v === 'true' || v === 'false') return 'bool';
-    if (/^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(v)) return 'variable'; // simple var/func name
-    return null; // complex expression — skip
+    if (/^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(v)) return 'variable';
+    return null;
   }
 
   _checkArgCount(def, callStr) {
@@ -1282,20 +1186,14 @@ class StonescriptParser {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       if (i === 0) {
-        // First line: everything before 'ascii' keyword + the keyword itself
-        // Capture prefix AND any spaces between prefix and 'ascii'
-        // e.g. 'var ear =  [  ascii' → prefix='var ear =  [', spaces='  ', kw='ascii'
         const m = line.match(/^(\s*)(.*?)(\s+)(ascii)(\s*)$/);
         if (m) {
-          // m[2]=prefix content, m[3]=spaces before ascii, m[4]='ascii', m[5]=trailing
           const pre = m[2] ? this._renderLineAsTokens(m[2]) + this._esc(m[3]) : this._esc(m[3]);
           out.push(indent + warns + pre + '<span class="keyword">ascii</span>');
         } else {
-          // ascii is the whole line (no prefix)
           out.push(indent + warns + '<span class="keyword">ascii</span>');
         }
       } else if (/^asciiend/.test(line.trim())) {
-        // asciiend may be followed by ] or other closing chars
         const after = line.trim().slice('asciiend'.length);
         out.push(indent + '<span class="keyword">asciiend</span>' + this._esc(after));
       } else {
@@ -1332,9 +1230,10 @@ class StonescriptParser {
   }
   _warn(type, message, severity = 'error') { return { type, message, severity }; }
   _warnW(type, message) { return this._warn(type, message, 'warning'); }
-  _leadingSpaces(line) {
-    // Normalize tabs to 2 spaces before counting indent.
-    // This ensures tabs and spaces are interchangeable for indentation.
+
+  // FIX: _indentWidth returns the VISUAL width (tabs=2) for indentation level.
+  // Content extraction now uses trimStart() to avoid the tab/slice mismatch.
+  _indentWidth(line) {
     let count = 0;
     for (let i = 0; i < line.length; i++) {
       if (line[i] === ' ')  { count++; }
@@ -1342,6 +1241,11 @@ class StonescriptParser {
       else break;
     }
     return count;
+  }
+
+  // LEGACY alias — kept for backward compat if anything external uses it
+  _leadingSpaces(line) {
+    return this._indentWidth(line);
   }
 }
 
